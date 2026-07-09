@@ -20,6 +20,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   if (role === null) return Response.json({ error: "스페이스가 없습니다." }, { status: 404 });
   if (!hasRole(role, "editor")) return Response.json({ error: "편집 권한이 필요합니다." }, { status: 403 });
 
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_SIZE + 1024 * 1024) {
+    return Response.json({ error: "20MB 이하만 업로드할 수 있습니다." }, { status: 413 });
+  }
+
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) return Response.json({ error: "file 필드가 필요합니다." }, { status: 400 });

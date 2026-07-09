@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       "Content-Type": att.mime,
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.filename)}`,
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "private, no-cache",
     },
   });
 }
