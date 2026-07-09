@@ -147,6 +147,8 @@ next-env.d.ts
 test-results/
 playwright-report/
 *.tsbuildinfo
+.superpowers/
+.omc/
 ```
 
 - [ ] **Step 2: 앱 최소 골격 작성**
