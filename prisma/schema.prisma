@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// id는 Keycloak ID 토큰의 sub 클레임을 그대로 사용한다.
+model User {
+  id        String   @id
+  email     String   @default("")
+  name      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+enum SpaceVisibility {
+  organization
+  restricted
+}
+
+enum SpaceRole {
+  viewer
+  editor
+  admin
+}
+
+enum SubjectType {
+  user
+  group
+}
+
+model Space {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  name        String
+  description String            @default("")
+  visibility  SpaceVisibility   @default(organization)
+  createdAt   DateTime          @default(now())
+  pages       Page[]
+  permissions SpacePermission[]
+  attachments Attachment[]
+}
+
+model SpacePermission {
+  id          String      @id @default(cuid())
+  spaceId     String
+  space       Space       @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  subjectType SubjectType
+  // subjectType=user면 User.id(=Keycloak sub), group이면 Keycloak 그룹 경로(예: "/engineering")
+  subjectRef  String
+  role        SpaceRole
+
+  @@unique([spaceId, subjectType, subjectRef])
+}
+
+model Page {
+  id           String                   @id @default(cuid())
+  spaceId      String
+  space        Space                    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  slug         String
+  title        String
+  content      String                   @default("")
+  // 마이그레이션 SQL에서 GENERATED ALWAYS 컬럼으로 교체된다 (Step 3)
+  searchVector Unsupported("tsvector")?
+  createdById  String
+  updatedById  String
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  revisions    PageRevision[]
+  linksFrom    PageLink[]
+
+  @@unique([spaceId, slug])
+}
+
+model PageRevision {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version   Int
+  title     String
+  content   String
+  authorId  String
+  createdAt DateTime @default(now())
+
+  @@unique([pageId, version])
+}
+
+model PageLink {
+  id         String @id @default(cuid())
+  fromPageId String
+  fromPage   Page   @relation(fields: [fromPageId], references: [id], onDelete: Cascade)
+  toSpaceId  String
+  toSlug     String
+
+  @@unique([fromPageId, toSpaceId, toSlug])
+  @@index([toSpaceId, toSlug])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  spaceId    String
+  space      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  pageId     String?
+  filename   String
+  mime       String
+  size       Int
+  storageKey String   @unique
+  uploaderId String
+  createdAt  DateTime @default(now())
+}
