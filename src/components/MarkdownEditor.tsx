@@ -18,11 +18,19 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave,
   const [html, setHtml] = useState("");
   const [saving, setSaving] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewSeq = useRef(0);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      preview(content).then(setHtml).catch(() => setHtml("<p>미리보기 실패</p>"));
+      const seq = ++previewSeq.current;
+      preview(content)
+        .then((h) => {
+          if (seq === previewSeq.current) setHtml(h);
+        })
+        .catch(() => {
+          if (seq === previewSeq.current) setHtml("<p>미리보기 실패</p>");
+        });
     }, 500);
     return () => {
       if (timer.current) clearTimeout(timer.current);
