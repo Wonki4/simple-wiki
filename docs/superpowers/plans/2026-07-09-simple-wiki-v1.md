@@ -411,12 +411,14 @@ git commit -m "chore: docker-compose에 PostgreSQL + Keycloak(realm 자동 임�
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
 }
 
 // id는 Keycloak ID 토큰의 sub 클레임을 그대로 사용한다.
@@ -484,6 +486,8 @@ model Page {
   linksFrom    PageLink[]
 
   @@unique([spaceId, slug])
+  @@index([searchVector], type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_title_trgm_idx")
 }
 
 model PageRevision {
