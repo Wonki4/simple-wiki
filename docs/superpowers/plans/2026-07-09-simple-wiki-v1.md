@@ -234,7 +234,7 @@ git commit -m "chore: Next.js 15 + TypeScript + Tailwind + Vitest 스캐폴드"
 - Create: `docker-compose.yml`, `keycloak/realm-export.json`, `.env.example`
 
 **Interfaces:**
-- Produces: `localhost:5432` PostgreSQL(wiki/wiki/wiki), `localhost:8080` Keycloak.
+- Produces: `localhost:5433` PostgreSQL(wiki/wiki/wiki — 호스트 5432는 이 머신의 다른 프로젝트가 사용 중이라 5433으로 매핑), `localhost:8080` Keycloak.
   realm `simple-wiki`, client `simple-wiki-app`(secret `dev-only-secret`), realm 역할 `wiki-admin`,
   그룹 `/engineering` `/hr`, 테스트 유저 `wiki-admin/admin1234`(wiki-admin 역할), `alice/alice1234`(/engineering), `bob/bob1234`(그룹 없음).
   ID 토큰에 `groups`(풀 경로), `realm_roles` 클레임 포함 — Task 7의 auth 콜백이 이 클레임 이름에 의존.
@@ -250,7 +250,7 @@ services:
       POSTGRES_PASSWORD: wiki
       POSTGRES_DB: wiki
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -366,7 +366,7 @@ volumes:
 
 `.env.example`:
 ```
-DATABASE_URL=postgresql://wiki:wiki@localhost:5432/wiki
+DATABASE_URL=postgresql://wiki:wiki@localhost:5433/wiki
 AUTH_SECRET=dev-secret-change-me
 AUTH_URL=http://localhost:3000
 AUTH_KEYCLOAK_ID=simple-wiki-app
