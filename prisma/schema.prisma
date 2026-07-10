@@ -87,6 +87,9 @@ model Page {
   searchVector Unsupported("tsvector")?
   createdById  String
   updatedById  String
+  // 마지막 편집 출처: "web"(사람, 브라우저) | "api"(개인 액세스 토큰 = 봇/LLM)
+  updatedSource   String                @default("web")
+  updatedViaLabel String?               // api일 때 토큰 이름(예: "Claude Desktop")
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
   revisions    PageRevision[]
@@ -106,6 +109,9 @@ model PageRevision {
   title     String
   content   String
   authorId  String
+  // 이 리비전의 출처: "web"(사람) | "api"(토큰/봇/LLM)
+  source    String   @default("web")
+  viaLabel  String?  // api일 때 토큰 이름
   createdAt DateTime @default(now())
 
   @@unique([pageId, version])

@@ -43,6 +43,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
       title,
       content,
       authorId: auth.actor.userId,
+      source: auth.actor.via === "token" ? "api" : "web",
+      viaLabel: auth.actor.via === "token" ? auth.actor.tokenName : null,
     });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "생성 실패" }, { status: 400 });

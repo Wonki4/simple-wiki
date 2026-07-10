@@ -19,11 +19,16 @@ async function nextVersion(tx: Prisma.TransactionClient, pageId: string): Promis
   return (last._max.version ?? 0) + 1;
 }
 
+export type EditSource = "web" | "api";
+
 export interface WritePageInput {
   spaceId: string;
   title: string;
   content: string;
   authorId: string;
+  // 편집 출처. 생략 시 "web"(사람). API 토큰 경로는 "api" + 토큰 이름을 넘긴다.
+  source?: EditSource;
+  viaLabel?: string | null;
 }
 
 /**
@@ -44,6 +49,9 @@ export async function createPageInSpace(
   });
   if (existing) return { slug, created: false };
 
+  const source = input.source ?? "web";
+  const viaLabel = input.viaLabel ?? null;
+
   await prisma.$transaction(async (tx) => {
     const page = await tx.page.create({
       data: {
@@ -53,10 +61,12 @@ export async function createPageInSpace(
         content: input.content,
         createdById: input.authorId,
         updatedById: input.authorId,
+        updatedSource: source,
+        updatedViaLabel: viaLabel,
       },
     });
     await tx.pageRevision.create({
-      data: { pageId: page.id, version: 1, title, content: input.content, authorId: input.authorId },
+      data: { pageId: page.id, version: 1, title, content: input.content, authorId: input.authorId, source, viaLabel },
     });
     await syncLinks(tx, page.id, input.spaceId, input.content);
   });
@@ -79,10 +89,19 @@ export async function updatePageInSpace(
   });
   if (!page) return false;
 
+  const source = input.source ?? "web";
+  const viaLabel = input.viaLabel ?? null;
+
   await prisma.$transaction(async (tx) => {
     await tx.page.update({
       where: { id: page.id },
-      data: { title, content: input.content, updatedById: input.authorId },
+      data: {
+        title,
+        content: input.content,
+        updatedById: input.authorId,
+        updatedSource: source,
+        updatedViaLabel: viaLabel,
+      },
     });
     await tx.pageRevision.create({
       data: {
@@ -91,6 +110,8 @@ export async function updatePageInSpace(
         title,
         content: input.content,
         authorId: input.authorId,
+        source,
+        viaLabel,
       },
     });
     await syncLinks(tx, page.id, input.spaceId, input.content);

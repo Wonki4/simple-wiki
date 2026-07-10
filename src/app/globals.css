@@ -534,6 +534,24 @@ mark {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+/* LLM/API 편집 뱃지 — 마지막 수정/이력 옆에 인라인으로 붙는다 */
+.badge-bot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  margin-left: 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.08rem 0.44rem;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .muted {
   color: var(--muted);
 }

@@ -56,6 +56,8 @@ export async function PUT(
       title,
       content,
       authorId: auth.actor.userId,
+      source: auth.actor.via === "token" ? "api" : "web",
+      viaLabel: auth.actor.via === "token" ? auth.actor.tokenName : null,
     });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "수정 실패" }, { status: 400 });

@@ -6,6 +6,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import { extractWikiLinks } from "@/lib/wiki-links";
 import { deletePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { EditSourceBadge } from "@/components/EditSourceBadge";
 
 export default async function PageView({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
   const { spaceKey, slug: rawSlug } = await params;
@@ -63,6 +64,7 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
           <h1 className="page-title mt-1.5">{page.title}</h1>
           <p className="meta mt-2">
             마지막 수정 {page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
+            <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
           </p>
         </div>
         {canEdit && (

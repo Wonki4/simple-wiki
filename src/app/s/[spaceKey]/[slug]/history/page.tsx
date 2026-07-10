@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
+import { EditSourceBadge } from "@/components/EditSourceBadge";
 
 export default async function HistoryPage({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
   const { spaceKey, slug: rawSlug } = await params;
@@ -38,6 +39,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ spaceK
             </span>
             <span className="meta">
               {authorName.get(r.authorId) ?? r.authorId} · {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+              <EditSourceBadge source={r.source} label={r.viaLabel} />
             </span>
           </li>
         ))}

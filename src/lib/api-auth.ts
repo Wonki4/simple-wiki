@@ -16,13 +16,16 @@ export function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
+// 행위자 + 인증 경로. via="token"이면 봇/LLM 편집으로 간주하고 tokenName을 표시에 쓴다.
+export type ApiActor = SessionInfo & { via: "token" | "session"; tokenName: string | null };
+
 /**
  * API 요청의 행위자를 판정한다.
  * 1) Authorization: Bearer swk_... 개인 액세스 토큰 → 해당 사용자(로그인 시점 권한 스냅샷)
  * 2) 없으면 브라우저 세션 쿠키로 폴백
  * 인증 실패 시 null.
  */
-export async function resolveApiActor(req: NextRequest): Promise<SessionInfo | null> {
+export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null> {
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const raw = auth.slice(7).trim();
@@ -40,18 +43,21 @@ export async function resolveApiActor(req: NextRequest): Promise<SessionInfo | n
         userId: token.user.id,
         groups: token.user.groups,
         isWikiAdmin: token.user.isWikiAdmin,
+        via: "token",
+        tokenName: token.name,
       };
     }
     return null;
   }
-  return getSessionInfo();
+  const s = await getSessionInfo();
+  return s ? { ...s, via: "session", tokenName: null } : null;
 }
 
 type SpaceWithPermissions = Space & { permissions: SpacePermission[] };
 
 interface SpaceAuthOk {
   ok: true;
-  actor: SessionInfo;
+  actor: ApiActor;
   space: SpaceWithPermissions;
   role: SpaceRole;
 }
