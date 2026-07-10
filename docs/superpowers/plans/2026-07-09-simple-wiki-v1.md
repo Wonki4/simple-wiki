@@ -488,6 +488,7 @@ model Page {
   @@unique([spaceId, slug])
   @@index([searchVector], type: Gin)
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_title_trgm_idx")
+  @@index([content(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_content_trgm_idx")
 }
 
 model PageRevision {
@@ -2514,6 +2515,7 @@ export async function searchPages(q: string, readableSpaceIds: string[]): Promis
       AND (
         p."searchVector" @@ websearch_to_tsquery('simple', ${query})
         OR p."title" ILIKE '%' || ${query} || '%'
+        OR p."content" ILIKE '%' || ${query} || '%'
       )
     ORDER BY ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) DESC
     LIMIT 50
