@@ -14,8 +14,9 @@ export default async function NewPagePage({
   const { title } = await searchParams;
   await requireSpaceRole(spaceKey, "editor");
   return (
-    <main className="py-8">
-      <h1 className="mb-4 text-xl font-bold">새 페이지</h1>
+    <main className="py-10">
+      <p className="eyebrow">{spaceKey} · new page</p>
+      <h1 className="page-title mb-5 mt-1">새 페이지</h1>
       <MarkdownEditor
         spaceKey={spaceKey}
         initialTitle={title ?? ""}

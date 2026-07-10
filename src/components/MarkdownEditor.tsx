@@ -72,19 +72,19 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave,
         onChange={(e) => setTitle(e.target.value)}
         required
         placeholder="제목"
-        className="w-full rounded border border-gray-300 px-3 py-2 text-lg font-semibold"
+        className="input input-title"
       />
       <input type="hidden" name="content" value={content} />
-      <div className="mt-4 grid grid-cols-2 gap-4" onPaste={handlePaste}>
-        <div className="min-h-[400px] overflow-hidden rounded border border-gray-300">
-          <CodeMirror value={content} height="400px" extensions={[markdown()]} onChange={setContent} />
+      <div className="editor-grid mt-4" onPaste={handlePaste}>
+        <div className="editor-pane">
+          <CodeMirror value={content} height="420px" extensions={[markdown()]} onChange={setContent} />
         </div>
-        <div className="prose-wiki min-h-[400px] overflow-auto rounded border border-gray-100 bg-gray-50 p-4"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div className="editor-preview prose-wiki" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
-      <p className="mt-2 text-xs text-gray-400">이미지를 붙여넣으면 자동으로 업로드됩니다. [[페이지명]]으로 위키링크를 만들 수 있습니다.</p>
-      <button disabled={saving} className="mt-4 rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+      <p className="meta mt-2.5">
+        이미지를 붙여넣으면 자동으로 업로드됩니다. [[페이지명]]으로 위키링크를 만들 수 있습니다.
+      </p>
+      <button disabled={saving} className="btn btn-primary mt-4">
         {saving ? "저장 중..." : "저장"}
       </button>
     </form>

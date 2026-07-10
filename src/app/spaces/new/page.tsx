@@ -6,29 +6,32 @@ export default async function NewSpacePage() {
   const session = await requireSession();
   if (!session.isWikiAdmin) redirect("/denied");
   return (
-    <main className="py-8">
-      <h1 className="text-2xl font-bold">새 스페이스</h1>
-      <form action={createSpace} className="mt-6 max-w-md space-y-4">
-        <label className="block text-sm">
-          키 (URL용, 소문자/숫자/하이픈)
-          <input name="key" required pattern="[a-z0-9][a-z0-9-]{1,31}" className="mt-1 w-full rounded border border-gray-300 px-2 py-1" />
+    <main className="py-10">
+      <p className="eyebrow">new workspace</p>
+      <h1 className="page-title mt-1">새 스페이스</h1>
+      <form action={createSpace} className="mt-7 grid max-w-md gap-4">
+        <label className="field">
+          <span>키 (URL용, 소문자/숫자/하이픈)</span>
+          <input name="key" required pattern="[a-z0-9][a-z0-9-]{1,31}" className="input" style={{ fontFamily: "var(--font-mono)" }} />
         </label>
-        <label className="block text-sm">
-          이름
-          <input name="name" required className="mt-1 w-full rounded border border-gray-300 px-2 py-1" />
+        <label className="field">
+          <span>이름</span>
+          <input name="name" required className="input" />
         </label>
-        <label className="block text-sm">
-          설명
-          <input name="description" className="mt-1 w-full rounded border border-gray-300 px-2 py-1" />
+        <label className="field">
+          <span>설명</span>
+          <input name="description" className="input" />
         </label>
-        <label className="block text-sm">
-          공개 범위
-          <select name="visibility" className="mt-1 w-full rounded border border-gray-300 px-2 py-1">
+        <label className="field">
+          <span>공개 범위</span>
+          <select name="visibility" className="select">
             <option value="organization">전사 공개 (로그인 사용자 모두 읽기)</option>
             <option value="restricted">제한 (권한 부여된 대상만)</option>
           </select>
         </label>
-        <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white">만들기</button>
+        <div>
+          <button className="btn btn-primary">만들기</button>
+        </div>
       </form>
     </main>
   );

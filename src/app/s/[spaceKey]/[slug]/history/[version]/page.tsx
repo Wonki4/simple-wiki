@@ -32,25 +32,28 @@ export default async function RevisionPage({
   const html = await renderMarkdown(rev.content, { spaceKey, existingSlugs: new Set() });
 
   return (
-    <main className="py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">
-          {rev.title} <span className="text-gray-400">v{version}{isLatest && " (최신)"}</span>
-        </h1>
-        <div className="flex gap-2 text-sm">
-          <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="rounded border border-gray-300 px-3 py-1.5">
+    <main className="py-10">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="eyebrow">
+            revision v{version}{isLatest && " · 최신"}
+          </p>
+          <h1 className="page-title mt-1">{rev.title}</h1>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">
             이력으로
           </Link>
           {hasRole(role, "editor") && !isLatest && (
             <form action={restoreRevision.bind(null, spaceKey, slug, version)}>
-              <ConfirmSubmitButton message={`v${version} 내용으로 복원할까요? (새 버전으로 저장됩니다)`} className="rounded bg-blue-600 px-3 py-1.5 text-white">
+              <ConfirmSubmitButton message={`v${version} 내용으로 복원할까요? (새 버전으로 저장됩니다)`} className="btn btn-primary btn-sm">
                 이 버전으로 복원
               </ConfirmSubmitButton>
             </form>
           )}
         </div>
       </div>
-      <article className="prose-wiki mt-6" dangerouslySetInnerHTML={{ __html: html }} />
+      <article className="prose-wiki mt-7" dangerouslySetInnerHTML={{ __html: html }} />
     </main>
   );
 }

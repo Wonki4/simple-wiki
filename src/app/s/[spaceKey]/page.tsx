@@ -12,33 +12,39 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
     select: { id: true, slug: true, title: true, updatedAt: true },
   });
   return (
-    <main className="py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{space.name}</h1>
-        <div className="flex gap-2 text-sm">
+    <main className="py-10">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow">{space.key}</p>
+          <h1 className="page-title mt-1">{space.name}</h1>
+          {space.description && <p className="muted mt-1.5 text-sm">{space.description}</p>}
+        </div>
+        <div className="flex shrink-0 gap-2">
           {hasRole(role, "editor") && (
-            <Link href={`/s/${spaceKey}/new`} className="rounded bg-blue-600 px-3 py-1.5 text-white">
+            <Link href={`/s/${spaceKey}/new`} className="btn btn-primary">
               새 페이지
             </Link>
           )}
           {hasRole(role, "admin") && (
-            <Link href={`/s/${spaceKey}/settings`} className="rounded border border-gray-300 px-3 py-1.5">
+            <Link href={`/s/${spaceKey}/settings`} className="btn btn-ghost">
               설정
             </Link>
           )}
         </div>
       </div>
-      {space.description && <p className="mt-1 text-gray-500">{space.description}</p>}
-      <ul className="mt-6 space-y-1">
+
+      <ul className="mt-7">
         {pages.map((p) => (
-          <li key={p.id} className="flex items-baseline justify-between border-b border-gray-100 py-2">
-            <Link href={`/s/${spaceKey}/${encodeURIComponent(p.slug)}`} className="text-blue-600 underline">
+          <li key={p.id} className="row">
+            <Link href={`/s/${spaceKey}/${encodeURIComponent(p.slug)}`} className="row__title title-link">
               {p.title}
             </Link>
-            <span className="text-xs text-gray-400">{p.updatedAt.toISOString().slice(0, 10)}</span>
+            <span className="meta">{p.updatedAt.toISOString().slice(0, 10)}</span>
           </li>
         ))}
-        {pages.length === 0 && <li className="text-gray-500">아직 페이지가 없습니다.</li>}
+        {pages.length === 0 && (
+          <li className="muted mt-4 text-sm">아직 페이지가 없습니다.</li>
+        )}
       </ul>
     </main>
   );

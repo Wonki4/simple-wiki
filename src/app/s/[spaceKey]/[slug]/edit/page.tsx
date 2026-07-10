@@ -14,8 +14,9 @@ export default async function EditPagePage({ params }: { params: Promise<{ space
   });
   if (!page) notFound();
   return (
-    <main className="py-8">
-      <h1 className="mb-4 text-xl font-bold">페이지 편집</h1>
+    <main className="py-10">
+      <p className="eyebrow">{spaceKey} · edit</p>
+      <h1 className="page-title mb-5 mt-1">페이지 편집</h1>
       <MarkdownEditor
         spaceKey={spaceKey}
         initialTitle={page.title}

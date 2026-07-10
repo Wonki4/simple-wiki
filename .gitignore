@@ -8,3 +8,8 @@ playwright-report/
 *.tsbuildinfo
 .superpowers/
 .omc/
+
+# local screenshot / MCP browser scratch
+.playwright-mcp/
+/*.png
+_*.mjs

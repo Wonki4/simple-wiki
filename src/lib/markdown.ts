@@ -35,7 +35,13 @@ export async function renderMarkdown(markdown: string, opts: RenderOptions): Pro
     .use(remarkWikiLinks, opts)
     .use(remarkRehype)
     .use(rehypeSanitize, schema)
-    .use(rehypeShiki, { theme: "github-light", fallbackLanguage: "text" })
+    .use(rehypeShiki, {
+      // 라이트 색을 인라인 color로, 다크 색을 --shiki-dark CSS 변수로 내보낸다.
+      // globals.css가 prefers-color-scheme: dark에서 --shiki-dark를 활성화한다.
+      themes: { light: "github-light", dark: "github-dark" },
+      defaultColor: "light",
+      fallbackLanguage: "text",
+    })
     .use(rehypeStringify)
     .process(markdown);
   return String(file);
