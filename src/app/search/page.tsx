@@ -12,8 +12,9 @@ function Snippet({ text }: { text: string }) {
   );
 }
 
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  const { q: rawQ } = await searchParams;
+  const q = Array.isArray(rawQ) ? rawQ[0] : rawQ;
   const session = await requireSession();
   const spaces = await listReadableSpaces(session);
   const results = q ? await searchPages(q, spaces.map((s) => s.id)) : [];
