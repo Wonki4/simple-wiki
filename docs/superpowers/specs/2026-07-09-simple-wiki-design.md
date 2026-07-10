@@ -52,8 +52,10 @@ Next.js 단일 풀스택 앱 + PostgreSQL + Keycloak.
 - **스페이스 공개 범위**:
   - `organization`: 로그인한 모든 사용자가 읽기 가능 (쓰기는 별도 권한 필요)
   - `restricted`: 권한이 부여된 사용자/그룹만 접근 가능
-- **검사 지점**: 모든 데이터 접근은 서버 측 헬퍼 `requireSpaceRole(spaceKey, role)` 를
-  통과한다. 클라이언트 측 상태는 신뢰하지 않는다. 검색 결과도 읽기 권한이 있는
+- **검사 지점**: 모든 데이터 접근은 서버 측에서 인가된다. 페이지·서버 액션은
+  `requireSpaceRole(spaceKey, role)`(미로그인/무권한 시 redirect·notFound)로,
+  API route는 `getSessionInfo` + `resolveSpaceRole`/`hasRole`로 검사하고 401/403/404
+  JSON을 반환한다. 클라이언트 측 상태는 신뢰하지 않는다. 검색 결과도 읽기 권한이 있는
   스페이스로 필터링한다.
 
 ## 데이터 모델 (Prisma)
