@@ -9,6 +9,7 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 |---|---|---|
 | `list_spaces` | 읽을 수 있는 스페이스 목록 | viewer |
 | `list_pages` | 스페이스의 페이지 목록 | viewer |
+| `search_pages` | 제목·본문 전문 검색 | viewer |
 | `get_page` | 페이지 마크다운 원문 | viewer |
 | `create_page` | 새 페이지 생성 | editor |
 | `update_page` | 페이지 수정(새 리비전) | editor |

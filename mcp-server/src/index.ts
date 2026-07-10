@@ -70,6 +70,17 @@ server.registerTool(
 );
 
 server.registerTool(
+  "search_pages",
+  {
+    title: "위키 검색",
+    description:
+      "제목·본문 전문 검색. 읽을 수 있는 스페이스만 검색되며, 결과마다 스페이스 키/slug/제목/스니펫을 반환합니다.",
+    inputSchema: { query: z.string().describe("검색어") },
+  },
+  async ({ query }) => toResult(await api(`/api/search?q=${encodeURIComponent(query)}`)),
+);
+
+server.registerTool(
   "get_page",
   {
     title: "페이지 읽기",

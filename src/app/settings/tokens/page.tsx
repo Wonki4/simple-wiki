@@ -82,6 +82,10 @@ export default async function TokensPage() {
 curl -H "Authorization: Bearer <토큰>" \\
   http://localhost:3000/api/spaces
 
+# 전문 검색
+curl -H "Authorization: Bearer <토큰>" \\
+  "http://localhost:3000/api/search?q=배포"
+
 # 페이지 목록 / 마크다운 원문 읽기
 curl -H "Authorization: Bearer <토큰>" \\
   http://localhost:3000/api/spaces/eng/pages
