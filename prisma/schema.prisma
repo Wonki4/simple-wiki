@@ -76,6 +76,7 @@ model Page {
   @@unique([spaceId, slug])
   @@index([searchVector], type: Gin)
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_title_trgm_idx")
+  @@index([content(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_content_trgm_idx")
 }
 
 model PageRevision {

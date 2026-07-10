@@ -27,6 +27,7 @@ export async function searchPages(q: string, readableSpaceIds: string[]): Promis
       AND (
         p."searchVector" @@ websearch_to_tsquery('simple', ${query})
         OR p."title" ILIKE '%' || ${query} || '%'
+        OR p."content" ILIKE '%' || ${query} || '%'
       )
     ORDER BY ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) DESC
     LIMIT 50
