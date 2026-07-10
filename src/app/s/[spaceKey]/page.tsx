@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
-import { hasRole } from "@/lib/permissions";
 
 export default async function SpaceHome({ params }: { params: Promise<{ spaceKey: string }> }) {
   const { spaceKey } = await params;
-  const { space, role } = await requireSpaceRole(spaceKey, "viewer");
+  const { space } = await requireSpaceRole(spaceKey, "viewer");
   const pages = await prisma.page.findMany({
     where: { spaceId: space.id },
     orderBy: { updatedAt: "desc" },
@@ -13,25 +12,9 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
   });
   return (
     <main className="py-10">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="eyebrow">{space.key}</p>
-          <h1 className="page-title mt-1">{space.name}</h1>
-          {space.description && <p className="muted mt-1.5 text-sm">{space.description}</p>}
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {hasRole(role, "editor") && (
-            <Link href={`/s/${spaceKey}/new`} className="btn btn-primary">
-              새 페이지
-            </Link>
-          )}
-          {hasRole(role, "admin") && (
-            <Link href={`/s/${spaceKey}/settings`} className="btn btn-ghost">
-              설정
-            </Link>
-          )}
-        </div>
-      </div>
+      <p className="eyebrow">{space.key}</p>
+      <h1 className="page-title mt-1">{space.name}</h1>
+      {space.description && <p className="muted mt-1.5 text-sm">{space.description}</p>}
 
       <ul className="mt-7">
         {pages.map((p) => (
@@ -43,7 +26,9 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
           </li>
         ))}
         {pages.length === 0 && (
-          <li className="muted mt-4 text-sm">아직 페이지가 없습니다.</li>
+          <li className="muted mt-4 text-sm">
+            아직 문서가 없습니다. 왼쪽 메뉴의 &ldquo;+ 새 문서&rdquo;로 첫 문서를 만들어 보세요.
+          </li>
         )}
       </ul>
     </main>

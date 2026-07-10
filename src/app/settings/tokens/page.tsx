@@ -12,7 +12,7 @@ export default async function TokensPage() {
   });
 
   return (
-    <main className="py-10">
+    <main className="wrap py-10">
       <p className="eyebrow">settings · api</p>
       <h1 className="page-title mt-1">개인 액세스 토큰</h1>
       <p className="muted mt-2 max-w-2xl text-sm">

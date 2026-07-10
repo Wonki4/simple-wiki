@@ -6,9 +6,9 @@ import { login } from "./helpers";
 test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색", async ({ page }) => {
   await login(page, "alice", "alice1234");
 
-  // eng 스페이스 진입 및 페이지 생성
-  await page.getByRole("link", { name: "엔지니어링" }).click();
-  await page.getByRole("link", { name: "새 페이지" }).click();
+  // eng 스페이스 진입 및 페이지 생성 (좌측 LNB에서)
+  await page.getByRole("link", { name: "엔지니어링" }).first().click();
+  await page.getByRole("link", { name: "새 문서" }).click();
   await page.getByPlaceholder("제목").fill("E2E 온보딩");
   await page.locator(".toastui-editor-ww-container .ProseMirror").click();
   await page.keyboard.type("# 환영\n\n[[없는 문서]] 참고");

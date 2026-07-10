@@ -20,7 +20,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const results = q ? await searchPages(q, spaces.map((s) => s.id)) : [];
 
   return (
-    <main className="py-10">
+    <main className="wrap py-10">
       <p className="eyebrow">search</p>
       <h1 className="page-title mt-1">
         {q ? (

@@ -41,6 +41,7 @@
 
   --radius: 9px;
   --shadow: 0 1px 2px rgba(16, 20, 28, 0.04), 0 4px 16px rgba(16, 20, 28, 0.05);
+  --masthead-h: 57px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -119,6 +120,108 @@ mark {
 }
 .wrap-reading {
   max-width: 44rem;
+}
+
+/* ── Shell: 좌측 LNB + 콘텐츠 2단 ─────────────────────────────── */
+.shell {
+  display: flex;
+  align-items: flex-start;
+}
+.lnb {
+  flex: 0 0 244px;
+  width: 244px;
+  position: sticky;
+  top: var(--masthead-h);
+  height: calc(100vh - var(--masthead-h));
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 0.85rem 2rem;
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+}
+.lnb__section + .lnb__section {
+  margin-top: 1.6rem;
+}
+.lnb__label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 0 0.55rem;
+  margin-bottom: 0.45rem;
+}
+.lnb__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lnb__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 7px;
+  border-left: 2px solid transparent;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  transition: background 0.12s, color 0.12s;
+}
+.lnb__item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.lnb__item--active {
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-left-color: var(--accent);
+  font-weight: 500;
+}
+.lnb__key {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+.lnb__item--active .lnb__key {
+  color: var(--accent-strong);
+}
+.lnb__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lnb__add {
+  display: block;
+  padding: 0.35rem 0.55rem;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.lnb__add:hover {
+  color: var(--accent-strong);
+}
+.lnb__empty {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+.shell__content {
+  flex: 1;
+  min-width: 0;
+}
+.shell__inner {
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: 0 1.75rem;
+}
+@media (max-width: 860px) {
+  .lnb {
+    display: none;
+  }
+  .shell__inner {
+    padding: 0 1.25rem;
+  }
 }
 
 /* ── Masthead ─────────────────────────────────────────────────── */

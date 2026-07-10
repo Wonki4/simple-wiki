@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" className={plexMono.variable}>
       <body>
         <Header />
-        <div className="wrap">{children}</div>
+        {children}
       </body>
     </html>
   );

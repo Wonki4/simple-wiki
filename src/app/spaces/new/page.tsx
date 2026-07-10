@@ -6,7 +6,7 @@ export default async function NewSpacePage() {
   const session = await requireSession();
   if (!session.isWikiAdmin) redirect("/denied");
   return (
-    <main className="py-10">
+    <main className="wrap py-10">
       <p className="eyebrow">new workspace</p>
       <h1 className="page-title mt-1">새 스페이스</h1>
       <form action={createSpace} className="mt-7 grid max-w-md gap-4">
