@@ -82,12 +82,22 @@ export default async function TokensPage() {
 curl -H "Authorization: Bearer <토큰>" \\
   http://localhost:3000/api/spaces
 
-# 스페이스의 페이지 목록
+# 페이지 목록 / 마크다운 원문 읽기
 curl -H "Authorization: Bearer <토큰>" \\
   http://localhost:3000/api/spaces/eng/pages
-
-# 페이지 마크다운 원문
 curl -H "Authorization: Bearer <토큰>" \\
+  http://localhost:3000/api/spaces/eng/pages/배포-가이드
+
+# 새 페이지 생성 (editor 권한)
+curl -X POST -H "Authorization: Bearer <토큰>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"릴리스 노트","content":"# 릴리스 노트\\n\\n..."}' \\
+  http://localhost:3000/api/spaces/eng/pages
+
+# 페이지 수정 (editor 권한, 새 리비전 생성)
+curl -X PUT -H "Authorization: Bearer <토큰>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"배포 가이드","content":"# 배포 가이드\\n\\n수정됨"}' \\
   http://localhost:3000/api/spaces/eng/pages/배포-가이드`}</pre>
       </section>
     </main>

@@ -2,76 +2,38 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireSpaceRole } from "@/lib/access";
-import { slugify } from "@/lib/slug";
-import { extractWikiLinks } from "@/lib/wiki-links";
-
-async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: string, content: string) {
-  await tx.pageLink.deleteMany({ where: { fromPageId: pageId } });
-  const links = extractWikiLinks(content);
-  if (links.length > 0) {
-    await tx.pageLink.createMany({
-      data: links.map((l) => ({ fromPageId: pageId, toSpaceId: spaceId, toSlug: l.slug })),
-    });
-  }
-}
-
-async function nextVersion(tx: Prisma.TransactionClient, pageId: string): Promise<number> {
-  const last = await tx.pageRevision.aggregate({ where: { pageId }, _max: { version: true } });
-  return (last._max.version ?? 0) + 1;
-}
+import { createPageInSpace, updatePageInSpace } from "@/lib/pages";
 
 export async function createPage(spaceKey: string, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
   const title = String(formData.get("title") ?? "").trim();
   const content = String(formData.get("content") ?? "");
-  if (!title) throw new Error("제목을 입력하세요.");
-  const slug = slugify(title);
-  if (!slug) throw new Error("제목에 사용할 수 있는 문자가 없습니다.");
 
-  const existing = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+  const { slug, created } = await createPageInSpace({
+    spaceId: space.id,
+    title,
+    content,
+    authorId: session.userId,
   });
-  if (existing) redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`);
-
-  await prisma.$transaction(async (tx) => {
-    const page = await tx.page.create({
-      data: { spaceId: space.id, slug, title, content, createdById: session.userId, updatedById: session.userId },
-    });
-    await tx.pageRevision.create({
-      data: { pageId: page.id, version: 1, title, content, authorId: session.userId },
-    });
-    await syncLinks(tx, page.id, space.id, content);
-  });
+  // 같은 slug가 이미 있으면 그 페이지의 편집 화면으로 보낸다.
+  if (!created) redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`);
 
   revalidatePath(`/s/${spaceKey}`);
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }
 
-async function saveRevision(
-  spaceKey: string,
-  slug: string,
-  title: string,
-  content: string,
-): Promise<void> {
+async function saveRevision(spaceKey: string, slug: string, title: string, content: string): Promise<void> {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
-  const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+  const found = await updatePageInSpace({
+    spaceId: space.id,
+    slug,
+    title,
+    content,
+    authorId: session.userId,
   });
-  if (!page) throw new Error("페이지가 없습니다.");
-
-  await prisma.$transaction(async (tx) => {
-    await tx.page.update({
-      where: { id: page.id },
-      data: { title, content, updatedById: session.userId },
-    });
-    await tx.pageRevision.create({
-      data: { pageId: page.id, version: await nextVersion(tx, page.id), title, content, authorId: session.userId },
-    });
-    await syncLinks(tx, page.id, space.id, content);
-  });
+  if (!found) throw new Error("페이지가 없습니다.");
 
   revalidatePath(`/s/${spaceKey}`);
   revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
@@ -80,7 +42,6 @@ async function saveRevision(
 export async function updatePage(spaceKey: string, slug: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const content = String(formData.get("content") ?? "");
-  if (!title) throw new Error("제목을 입력하세요.");
   await saveRevision(spaceKey, slug, title, content);
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }
