@@ -429,30 +429,47 @@ mark {
   color: var(--ink-2);
 }
 
-/* ── Editor ───────────────────────────────────────────────────── */
-.editor-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+/* ── Editor (full-width, tab-switched) ────────────────────────── */
+.editor-tabs {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
 }
-@media (max-width: 720px) {
-  .editor-grid {
-    grid-template-columns: 1fr;
-  }
+.editor-tab {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0.35rem 0.9rem;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+.editor-tab:hover {
+  color: var(--ink);
+}
+.editor-tab-active {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(16, 20, 28, 0.05);
 }
 .editor-pane {
-  min-height: 420px;
+  min-height: 460px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   overflow: hidden;
   background: #ffffff;
 }
 .editor-preview {
-  min-height: 420px;
+  min-height: 460px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-2);
-  padding: 1.1rem 1.25rem;
+  background: var(--surface);
+  padding: 1.4rem 1.6rem;
   overflow: auto;
 }
 
