@@ -60,3 +60,57 @@ test("wiki-admin: 스페이스 생성과 권한 부여", async ({ page }) => {
   await page.getByRole("button", { name: "추가" }).click();
   await expect(page.getByRole("cell", { name: "/hr" })).toBeVisible();
 });
+
+test("첨부파일: 권한/SVG 차단", async ({ page, browser }) => {
+  await login(page, "alice", "alice1234");
+
+  const uploaded = await page.evaluate(async () => {
+    async function upload(bytes: number[], type: string, filename: string) {
+      const blob = new Blob([new Uint8Array(bytes)], { type });
+      const form = new FormData();
+      form.set("file", blob, filename);
+      const res = await fetch("/api/spaces/eng/attachments", { method: "POST", body: form });
+      return (await res.json()) as { id: string; url: string; filename: string };
+    }
+
+    const png = await upload(
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      "image/png",
+      "p.png"
+    );
+    const svgContent = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
+    const svgBytes = Array.from(new TextEncoder().encode(svgContent));
+    const svg = await upload(svgBytes, "image/svg+xml;charset=utf-8", "x.svg");
+    return { png, svg };
+  });
+
+  const pngHeaders = await page.evaluate(async (url) => {
+    const res = await fetch(url);
+    return {
+      disposition: res.headers.get("content-disposition"),
+      csp: res.headers.get("content-security-policy"),
+    };
+  }, uploaded.png.url);
+  expect(pngHeaders.disposition ?? "").toMatch(/^inline/);
+
+  const svgHeaders = await page.evaluate(async (url) => {
+    const res = await fetch(url);
+    return {
+      disposition: res.headers.get("content-disposition"),
+      csp: res.headers.get("content-security-policy"),
+    };
+  }, uploaded.svg.url);
+  expect(svgHeaders.disposition ?? "").toMatch(/^attachment/);
+  expect(svgHeaders.csp).toBeTruthy();
+
+  // 교차 스페이스 격리: bob은 eng 첨부파일에 접근할 수 없다(404)
+  const bobContext = await browser.newContext();
+  const bobPage = await bobContext.newPage();
+  await login(bobPage, "bob", "bob1234");
+  const bobStatus = await bobPage.evaluate(async (url) => {
+    const res = await fetch(url);
+    return res.status;
+  }, uploaded.png.url);
+  expect(bobStatus).toBe(404);
+  await bobContext.close();
+});

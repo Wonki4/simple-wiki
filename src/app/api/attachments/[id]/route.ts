@@ -18,13 +18,15 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!hasRole(role, "viewer")) return new Response("없습니다.", { status: 404 });
 
   const data = await storage.get(att.storageKey);
-  // SVG는 스크립트 실행이 가능하므로 inline 금지
-  const inline = att.mime.startsWith("image/") && att.mime !== "image/svg+xml";
+  // SVG 등 스크립트 실행이 가능한 타입은 인라인 금지: 래스터 이미지만 허용목록으로 명시
+  const baseMime = att.mime.split(";")[0].trim().toLowerCase();
+  const inline = ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(baseMime);
   return new Response(new Uint8Array(data), {
     headers: {
       "Content-Type": att.mime,
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.filename)}`,
       "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
       "Cache-Control": "private, no-cache",
     },
   });
