@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { updatePage } from "@/actions/pages";
-import { previewMarkdown } from "@/actions/preview";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 
 export default async function EditPagePage({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
@@ -22,7 +21,6 @@ export default async function EditPagePage({ params }: { params: Promise<{ space
         initialTitle={page.title}
         initialContent={page.content}
         onSave={updatePage.bind(null, spaceKey, slug)}
-        preview={previewMarkdown.bind(null, spaceKey)}
       />
     </main>
   );

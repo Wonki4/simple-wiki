@@ -429,71 +429,69 @@ mark {
   color: var(--ink-2);
 }
 
-/* ── Editor (full-width, tab-switched) ────────────────────────── */
-.editor-tabs {
-  display: inline-flex;
-  gap: 2px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 2px;
-}
-.editor-tab {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--muted);
-  padding: 0.35rem 0.9rem;
-  border-radius: 7px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: color 0.12s, background 0.12s;
-}
-.editor-tab:hover {
-  color: var(--ink);
-}
-.editor-tab-active {
-  background: var(--surface);
-  color: var(--ink);
-  border-color: var(--border);
-  box-shadow: 0 1px 2px rgba(16, 20, 28, 0.05);
-}
-.editor-pane {
-  min-height: 460px;
-  border: 1px solid var(--border-strong);
+/* ── Editor (WYSIWYG, Toast UI) ───────────────────────────────── */
+.wysiwyg {
   border-radius: var(--radius);
   overflow: hidden;
-  background: #ffffff;
 }
-.editor-preview {
-  min-height: 460px;
-  border: 1px solid var(--border);
+.wysiwyg .toastui-editor-defaultUI {
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--surface);
-  padding: 1.4rem 1.6rem;
-  overflow: auto;
+  font-family: var(--font-sans);
 }
-/* "나란히" 모드: 좁은 읽기 칸을 벗어나 화면 폭으로 넓게 펼친다 */
-.editor-wide {
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(93vw, 84rem);
+.wysiwyg .toastui-editor-toolbar {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
 }
-.editor-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  align-items: start;
+.wysiwyg .toastui-editor-defaultUI-toolbar {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
-@media (max-width: 860px) {
-  .editor-wide {
-    left: auto;
-    transform: none;
-    width: auto;
-  }
-  .editor-split {
-    grid-template-columns: 1fr;
-  }
+/* WYSIWYG 편집 영역이 렌더 페이지처럼 보이도록 본문 타이포를 맞춘다 */
+.wysiwyg .toastui-editor-contents {
+  font-family: var(--font-sans);
+  font-size: 0.98rem;
+  line-height: 1.72;
+  color: var(--ink-2);
+}
+.wysiwyg .toastui-editor-contents h1,
+.wysiwyg .toastui-editor-contents h2,
+.wysiwyg .toastui-editor-contents h3 {
+  color: var(--ink);
+  border: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.wysiwyg .toastui-editor-contents h1 { font-size: 1.5rem; }
+.wysiwyg .toastui-editor-contents h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+.wysiwyg .toastui-editor-contents h3 { font-size: 1.05rem; }
+.wysiwyg .toastui-editor-contents pre {
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.wysiwyg .toastui-editor-contents code { font-family: var(--font-mono); }
+.wysiwyg .toastui-editor-contents blockquote {
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--muted);
+}
+.wysiwyg .toastui-editor-contents table th,
+.wysiwyg .toastui-editor-contents table th * {
+  background: var(--surface-2);
+  color: var(--ink) !important;
+  font-weight: 600;
+}
+.wysiwyg .toastui-editor-contents table td,
+.wysiwyg .toastui-editor-contents table th {
+  border-color: var(--border-strong);
+}
+.wysiwyg .toastui-editor-contents a { color: var(--link); }
+/* Toast UI 다크 테마는 자체 변수를 쓰지만, 우리 표면 톤과 맞춘다 */
+.wysiwyg .toastui-editor-dark .toastui-editor-defaultUI,
+.wysiwyg .toastui-editor-dark {
+  border-color: var(--border-strong);
 }
 
 /* ── Prose (rendered markdown) ────────────────────────────────── */

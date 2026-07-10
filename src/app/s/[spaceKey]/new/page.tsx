@@ -1,6 +1,5 @@
 import { requireSpaceRole } from "@/lib/access";
 import { createPage } from "@/actions/pages";
-import { previewMarkdown } from "@/actions/preview";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 
 export default async function NewPagePage({
@@ -22,7 +21,6 @@ export default async function NewPagePage({
         initialTitle={title ?? ""}
         initialContent=""
         onSave={createPage.bind(null, spaceKey)}
-        preview={previewMarkdown.bind(null, spaceKey)}
       />
     </main>
   );
