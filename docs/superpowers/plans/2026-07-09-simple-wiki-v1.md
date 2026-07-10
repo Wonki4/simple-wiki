@@ -2804,6 +2804,10 @@ Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
 ​```bash
 npm test        # Vitest 단위 테스트
 npm run e2e     # Playwright (docker compose + seed 필요)
+
+# e2e 재실행 전 DB 초기화 (테스트가 생성한 데이터 제거)
+docker compose down -v && docker compose up -d
+npx prisma migrate deploy && npm run db:seed
 ​```
 
 ## 운영 배포
@@ -2812,6 +2816,8 @@ npm run e2e     # Playwright (docker compose + seed 필요)
 - 운영 Keycloak realm에 client 등록 후 `AUTH_KEYCLOAK_ISSUER` 교체
 - 마이그레이션: `npx prisma migrate deploy`
 - 첨부파일 볼륨: `ATTACHMENTS_DIR` 경로를 퍼시스턴트 볼륨으로 마운트
+- 업로드 요청 크기는 앱의 Content-Length 사전 검사가 best-effort이므로, 리버스 프록시에서
+  반드시 제한할 것 (예: nginx `client_max_body_size 21m`)
 ​```
 
 (README의 ​``` 는 실제 파일에서는 일반 코드펜스로 작성)
