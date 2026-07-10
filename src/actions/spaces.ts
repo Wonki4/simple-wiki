@@ -64,3 +64,13 @@ export async function removeSpacePermission(spaceKey: string, permissionId: stri
   await prisma.spacePermission.deleteMany({ where: { id: permissionId, spaceId: space.id } });
   revalidatePath(`/s/${spaceKey}/settings`);
 }
+
+export async function deleteSpace(spaceKey: string) {
+  const session = await requireSession();
+  if (!session.isWikiAdmin) redirect("/denied");
+  // Page/PageRevision/PageLink/SpacePermission/Attachment 레코드는 onDelete: Cascade로 함께 삭제된다.
+  // 첨부파일의 디스크 파일은 남는다(v1 허용) — 스토리지 정리는 추후 과제.
+  await prisma.space.deleteMany({ where: { key: spaceKey } });
+  revalidatePath("/");
+  redirect("/");
+}

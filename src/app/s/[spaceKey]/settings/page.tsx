@@ -1,10 +1,11 @@
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
-import { addSpacePermission, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
+import { addSpacePermission, deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 export default async function SpaceSettingsPage({ params }: { params: Promise<{ spaceKey: string }> }) {
   const { spaceKey } = await params;
-  const { space } = await requireSpaceRole(spaceKey, "admin");
+  const { session, space } = await requireSpaceRole(spaceKey, "admin");
 
   const userIds = space.permissions.filter((p) => p.subjectType === "user").map((p) => p.subjectRef);
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } });
@@ -80,6 +81,23 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
           <button className="rounded bg-blue-600 px-3 py-1.5 text-white">추가</button>
         </form>
       </section>
+
+      {session.isWikiAdmin && (
+        <section className="mt-10 border-t border-red-200 pt-4">
+          <h2 className="font-semibold text-red-600">위험 구역</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            스페이스를 삭제하면 모든 페이지, 이력, 권한, 첨부 기록이 함께 삭제됩니다. 되돌릴 수 없습니다.
+          </p>
+          <form action={deleteSpace.bind(null, spaceKey)} className="mt-2">
+            <ConfirmSubmitButton
+              message={`정말 "${space.name}" 스페이스를 삭제할까요? 되돌릴 수 없습니다.`}
+              className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600"
+            >
+              스페이스 삭제
+            </ConfirmSubmitButton>
+          </form>
+        </section>
+      )}
     </main>
   );
 }
