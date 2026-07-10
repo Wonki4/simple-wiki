@@ -22,10 +22,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = p.sub;
         token.groups = p.groups ?? [];
         token.realmRoles = p.realm_roles ?? [];
+        const groups = p.groups ?? [];
+        const isWikiAdmin = (p.realm_roles ?? []).includes("wiki-admin");
+        const name = p.name ?? p.preferred_username ?? "";
+        // 권한 스냅샷을 User에 저장 — API 토큰 요청이 이 값으로 권한을 판정한다.
         await prisma.user.upsert({
           where: { id: p.sub },
-          update: { email: p.email ?? "", name: p.name ?? p.preferred_username ?? "" },
-          create: { id: p.sub, email: p.email ?? "", name: p.name ?? p.preferred_username ?? "" },
+          update: { email: p.email ?? "", name, groups, isWikiAdmin },
+          create: { id: p.sub, email: p.email ?? "", name, groups, isWikiAdmin },
         });
       }
       return token;

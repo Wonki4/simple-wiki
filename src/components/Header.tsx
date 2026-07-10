@@ -17,6 +17,9 @@ export async function Header() {
         {session?.user ? (
           <div className="userbar">
             <span className="userbar__name">{session.user.name}</span>
+            <Link href="/settings/tokens" className="userbar__link">
+              토큰
+            </Link>
             <form
               action={async () => {
                 "use server";
