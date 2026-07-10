@@ -472,6 +472,29 @@ mark {
   padding: 1.4rem 1.6rem;
   overflow: auto;
 }
+/* "나란히" 모드: 좁은 읽기 칸을 벗어나 화면 폭으로 넓게 펼친다 */
+.editor-wide {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(93vw, 84rem);
+}
+.editor-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .editor-wide {
+    left: auto;
+    transform: none;
+    width: auto;
+  }
+  .editor-split {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ── Prose (rendered markdown) ────────────────────────────────── */
 .prose-wiki {

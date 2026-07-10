@@ -17,7 +17,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave,
   const [content, setContent] = useState(initialContent);
   const [html, setHtml] = useState("");
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<"write" | "preview">("write");
+  const [tab, setTab] = useState<"write" | "split" | "preview">("split");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeq = useRef(0);
 
@@ -55,6 +55,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave,
 
   return (
     <form
+      className={tab === "split" ? "editor-wide" : undefined}
       action={async (fd) => {
         setSaving(true);
         try {
@@ -86,19 +87,26 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave,
         </button>
         <button
           type="button"
+          className={`editor-tab${tab === "split" ? " editor-tab-active" : ""}`}
+          onClick={() => setTab("split")}
+        >
+          나란히
+        </button>
+        <button
+          type="button"
           className={`editor-tab${tab === "preview" ? " editor-tab-active" : ""}`}
           onClick={() => setTab("preview")}
         >
           미리보기
         </button>
       </div>
-      <div className="mt-3" onPaste={handlePaste}>
-        <div className="editor-pane" style={{ display: tab === "write" ? "block" : "none" }}>
+      <div className={`mt-3${tab === "split" ? " editor-split" : ""}`} onPaste={handlePaste}>
+        <div className="editor-pane" style={{ display: tab === "preview" ? "none" : "block" }}>
           <CodeMirror value={content} height="460px" extensions={[markdown()]} onChange={setContent} />
         </div>
         <div
           className="editor-preview prose-wiki"
-          style={{ display: tab === "preview" ? "block" : "none" }}
+          style={{ display: tab === "write" ? "none" : "block" }}
           dangerouslySetInnerHTML={{
             __html: html || '<p style="color:var(--faint)">내용을 입력하면 미리보기가 표시됩니다.</p>',
           }}
