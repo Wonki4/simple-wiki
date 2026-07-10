@@ -222,6 +222,18 @@ mark {
   .shell__inner {
     padding: 0 1.25rem;
   }
+  /* LNB가 사라지므로 로고 고정폭 컬럼을 풀고 자연스러운 헤더로 */
+  .masthead__inner {
+    padding: 0.5rem 1.25rem;
+    gap: 0.85rem;
+  }
+  .brand {
+    flex: none;
+    padding-left: 0;
+  }
+  .search {
+    padding-left: 0;
+  }
 }
 
 /* ── Masthead ─────────────────────────────────────────────────── */
@@ -233,45 +245,83 @@ mark {
   backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: 1px solid var(--border);
 }
+/* 헤더를 본문 컬럼에 정렬한다: 로고는 LNB 폭(244px) 자리, 검색은 콘텐츠 영역 */
 .masthead__inner {
-  max-width: 72rem;
-  margin-inline: auto;
-  padding: 0.6rem 1.25rem;
+  padding: 0.5rem 1.4rem 0.5rem 0;
   display: flex;
   align-items: center;
-  gap: 1rem;
 }
 .brand {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   color: var(--ink);
   white-space: nowrap;
-  display: inline-flex;
-  gap: 0.15em;
+  flex: 0 0 244px;
+  box-sizing: border-box;
+  padding-left: 1.4rem;
 }
-.brand__bracket {
+/* 문서(page) 뱃지 — 로고의 유일한 컬러 포인트 */
+.brand__badge {
+  width: 28px;
+  height: 28px;
   color: var(--accent);
+  flex: none;
+  transition: transform 0.18s ease;
 }
-.brand:hover .brand__bracket {
-  color: var(--accent-strong);
+.brand:hover .brand__badge {
+  transform: scale(1.06) rotate(-3deg);
+}
+.brand__word {
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  gap: 0.28ch;
+}
+.brand__word-1 {
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.brand__word-2 {
+  font-weight: 750;
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand:hover .brand__badge { transform: none; }
 }
 
 .search {
   flex: 1;
   min-width: 0;
+  display: flex;
+  padding-left: 1.75rem;
+}
+.search__box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 30rem;
+}
+.search__icon {
+  position: absolute;
+  left: 0.72rem;
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+  pointer-events: none;
+  transition: color 0.15s;
 }
 .search__field {
   width: 100%;
-  max-width: 26rem;
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 0.4rem 0.7rem;
+  border-radius: 9px;
+  padding: 0.48rem 2.6rem 0.48rem 2.15rem;
   font-size: 0.85rem;
   color: var(--ink);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .search__field::placeholder {
   color: var(--faint);
@@ -279,7 +329,37 @@ mark {
 .search__field:focus {
   outline: none;
   border-color: var(--accent);
+  background: var(--bg);
   box-shadow: 0 0 0 3px var(--ring);
+}
+.search__box:focus-within .search__icon {
+  color: var(--accent);
+}
+/* ⌘K 힌트 — 실제로 검색창을 포커스한다(SearchBox의 키 리스너) */
+.search__kbd {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.16rem 0.36rem;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.search__box:focus-within .search__kbd {
+  opacity: 0;
+}
+/* 검색 입력의 브라우저 기본 클리어 버튼 숨김(우리 ⌘K 힌트와 겹침 방지) */
+.search__field::-webkit-search-decoration,
+.search__field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .userbar {
@@ -532,70 +612,52 @@ mark {
   color: var(--ink-2);
 }
 
-/* ── Editor (WYSIWYG, Toast UI) ───────────────────────────────── */
+/* ── Editor (Milkdown Crepe, 블록형 WYSIWYG) ───────────────────── */
 .wysiwyg {
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.wysiwyg .toastui-editor-defaultUI {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  font-family: var(--font-sans);
+  background: var(--surface);
+  /* overflow는 숨기지 않는다: 슬래시(/) 메뉴·블록 핸들이 위로 열릴 때 잘리면 안 됨 */
 }
-.wysiwyg .toastui-editor-toolbar {
-  border-top-left-radius: var(--radius);
-  border-top-right-radius: var(--radius);
+/* Crepe 색상 변수를 우리 디자인 토큰에 매핑한다.
+   토큰이 다크모드에서 자동으로 뒤집히므로 에디터도 함께 따라온다. */
+.wysiwyg .milkdown {
+  --crepe-color-background: var(--surface);
+  --crepe-color-on-background: var(--ink-2);
+  --crepe-color-surface: var(--surface);
+  --crepe-color-surface-low: var(--surface-2);
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--muted);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-outline: var(--border);
+  --crepe-color-inverse: var(--ink);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: var(--accent);
+  --crepe-color-error: var(--danger);
+  --crepe-color-hover: var(--surface-2);
+  --crepe-color-selected: color-mix(in srgb, var(--accent) 16%, transparent);
+  --crepe-color-inline-area: var(--surface-2);
+  --crepe-font-title: var(--font-sans);
+  --crepe-font-default: var(--font-sans);
+  --crepe-font-code: var(--font-mono);
+  background: var(--surface);
+  border-radius: var(--radius);
 }
-.wysiwyg .toastui-editor-defaultUI-toolbar {
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-}
-/* WYSIWYG 편집 영역이 렌더 페이지처럼 보이도록 본문 타이포를 맞춘다 */
-.wysiwyg .toastui-editor-contents {
-  font-family: var(--font-sans);
+/* 편집 영역 타이포를 렌더 페이지(.prose-wiki)와 맞춘다 */
+.wysiwyg .milkdown .ProseMirror {
   font-size: 0.98rem;
   line-height: 1.72;
-  color: var(--ink-2);
+  padding: 1.4rem 1.5rem;
+  min-height: 460px;
 }
-.wysiwyg .toastui-editor-contents h1,
-.wysiwyg .toastui-editor-contents h2,
-.wysiwyg .toastui-editor-contents h3 {
-  color: var(--ink);
-  border: 0;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.wysiwyg .toastui-editor-contents h1 { font-size: 1.5rem; }
-.wysiwyg .toastui-editor-contents h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
-.wysiwyg .toastui-editor-contents h3 { font-size: 1.05rem; }
-.wysiwyg .toastui-editor-contents pre {
-  font-family: var(--font-mono);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.wysiwyg .toastui-editor-contents code { font-family: var(--font-mono); }
-.wysiwyg .toastui-editor-contents blockquote {
-  border-left: 3px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-  color: var(--muted);
-}
-.wysiwyg .toastui-editor-contents table th,
-.wysiwyg .toastui-editor-contents table th * {
-  background: var(--surface-2);
-  color: var(--ink) !important;
-  font-weight: 600;
-}
-.wysiwyg .toastui-editor-contents table td,
-.wysiwyg .toastui-editor-contents table th {
-  border-color: var(--border-strong);
-}
-.wysiwyg .toastui-editor-contents a { color: var(--link); }
-/* Toast UI 다크 테마는 자체 변수를 쓰지만, 우리 표면 톤과 맞춘다 */
-.wysiwyg .toastui-editor-dark .toastui-editor-defaultUI,
-.wysiwyg .toastui-editor-dark {
-  border-color: var(--border-strong);
-}
+/* 편집 중 제목 색을 렌더 페이지처럼 잉크 톤으로 맞춘다(앰버는 링크/강조 전용) */
+.wysiwyg .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) { color: var(--ink); }
+.wysiwyg .milkdown .ProseMirror h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+.wysiwyg .milkdown .ProseMirror h2 { font-size: 1.2rem; font-weight: 650; }
+.wysiwyg .milkdown .ProseMirror h3 { font-size: 1.05rem; font-weight: 600; }
+.wysiwyg .milkdown .ProseMirror code { font-family: var(--font-mono); }
 
 /* ── Prose (rendered markdown) ────────────────────────────────── */
 .prose-wiki {

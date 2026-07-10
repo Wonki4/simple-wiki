@@ -1,19 +1,25 @@
 import Link from "next/link";
 import { auth, signIn, signOut } from "@/auth";
+import { SearchBox } from "@/components/SearchBox";
 
 export async function Header() {
   const session = await auth();
   return (
     <header className="masthead">
       <div className="masthead__inner">
-        <Link href="/" className="brand" aria-label="simple-wiki 홈">
-          <span className="brand__bracket">[[</span>
-          simple-wiki
-          <span className="brand__bracket">]]</span>
+        <Link href="/" className="brand" aria-label="simple wiki 홈">
+          <svg className="brand__badge" viewBox="0 0 24 24" aria-hidden="true">
+            <rect width="24" height="24" rx="6" fill="currentColor" />
+            <rect x="6.5" y="7" width="11" height="2" rx="1" fill="#fff" />
+            <rect x="6.5" y="11" width="11" height="2" rx="1" fill="#fff" />
+            <rect x="6.5" y="15" width="7" height="2" rx="1" fill="#fff" />
+          </svg>
+          <span className="brand__word">
+            <span className="brand__word-1">simple</span>
+            <span className="brand__word-2">wiki</span>
+          </span>
         </Link>
-        <form action="/search" method="GET" className="search">
-          <input type="search" name="q" placeholder="검색" className="search__field" />
-        </form>
+        <SearchBox />
         {session?.user ? (
           <div className="userbar">
             <span className="userbar__name">{session.user.name}</span>

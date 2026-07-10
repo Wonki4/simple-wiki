@@ -10,7 +10,7 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
   await page.getByRole("link", { name: "엔지니어링" }).first().click();
   await page.getByRole("link", { name: "새 문서" }).click();
   await page.getByPlaceholder("제목").fill("E2E 온보딩");
-  await page.locator(".toastui-editor-ww-container .ProseMirror").click();
+  await page.locator(".milkdown .ProseMirror").click();
   await page.keyboard.type("# 환영\n\n[[없는 문서]] 참고");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "E2E 온보딩" })).toBeVisible();
@@ -18,7 +18,7 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
 
   // 편집 → 이력 2개
   await page.getByRole("link", { name: "편집" }).click();
-  await page.locator(".toastui-editor-ww-container .ProseMirror").click();
+  await page.locator(".milkdown .ProseMirror").click();
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type("\n\n두 번째 버전");
   await page.getByRole("button", { name: "저장" }).click();
