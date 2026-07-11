@@ -115,3 +115,30 @@ test("첨부파일: 권한/SVG 차단", async ({ page, browser }) => {
   expect(bobStatus).toBe(404);
   await bobContext.close();
 });
+
+test("검색 권한 격리: 비권한자에겐 제한 스페이스 문서가 검색되지 않는다", async ({ page, browser }) => {
+  const marker = "제트팩추진체";
+
+  // alice(eng editor)가 제한 스페이스 eng에 고유어가 담긴 문서를 만든다
+  await login(page, "alice", "alice1234");
+  await page.getByRole("link", { name: "엔지니어링" }).first().click();
+  await page.getByRole("link", { name: "새 문서" }).click();
+  await page.getByPlaceholder("제목").fill("검색격리 테스트");
+  await page.locator(".milkdown .ProseMirror").click();
+  await page.keyboard.type(`# 검색격리\n\n${marker} 는 eng 전용 고유어`);
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("heading", { name: "검색격리 테스트" })).toBeVisible();
+
+  // alice는 검색으로 찾을 수 있다
+  await page.goto(`/search?q=${encodeURIComponent(marker)}`);
+  await expect(page.getByRole("link", { name: "검색격리 테스트" })).toBeVisible();
+
+  // bob(eng 무권한, notice만 읽음)은 같은 검색어로 0건이어야 한다
+  const bobContext = await browser.newContext();
+  const bob = await bobContext.newPage();
+  await login(bob, "bob", "bob1234");
+  await bob.goto(`/search?q=${encodeURIComponent(marker)}`);
+  await expect(bob.getByText("결과가 없습니다.")).toBeVisible();
+  await expect(bob.getByRole("link", { name: "검색격리 테스트" })).toHaveCount(0);
+  await bobContext.close();
+});

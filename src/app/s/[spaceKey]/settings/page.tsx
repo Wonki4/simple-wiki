@@ -51,7 +51,12 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
                   <td>{p.role}</td>
                   <td className="text-right">
                     <form action={removeSpacePermission.bind(null, spaceKey, p.id)}>
-                      <button className="btn btn-danger btn-sm">삭제</button>
+                      <ConfirmSubmitButton
+                        message={`"${p.subjectType === "user" ? (userLabel.get(p.subjectRef) ?? p.subjectRef) : p.subjectRef}"의 ${p.role} 권한을 삭제할까요?`}
+                        className="btn btn-danger btn-sm"
+                      >
+                        삭제
+                      </ConfirmSubmitButton>
                     </form>
                   </td>
                 </tr>
