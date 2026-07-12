@@ -20,6 +20,35 @@ model User {
   isWikiAdmin Boolean  @default(false)
   createdAt DateTime @default(now())
   apiTokens ApiToken[]
+  likes     Like[]
+  comments  Comment[]
+}
+
+// 페이지 좋아요. 사용자당 페이지 1회.
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, pageId])
+  @@index([userId])
+  @@index([pageId])
+}
+
+// 페이지 댓글(평면). 본문은 일반 텍스트.
+model Comment {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([pageId])
 }
 
 // 개인 액세스 토큰 (MCP 등 프로그램 접근용). 원문은 저장하지 않고 SHA-256 해시만 보관한다.
@@ -94,6 +123,8 @@ model Page {
   updatedAt    DateTime                 @updatedAt
   revisions    PageRevision[]
   linksFrom    PageLink[]
+  likes        Like[]
+  comments     Comment[]
 
   @@unique([spaceId, slug])
   @@index([searchVector], type: Gin)

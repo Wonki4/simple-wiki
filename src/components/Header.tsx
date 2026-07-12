@@ -22,7 +22,9 @@ export async function Header() {
         <SearchBox />
         {session?.user ? (
           <div className="userbar">
-            <span className="userbar__name">{session.user.name}</span>
+            <Link href="/me" className="userbar__name" title="마이페이지">
+              {session.user.name}
+            </Link>
             <Link href="/settings/tokens" className="userbar__link">
               토큰
             </Link>

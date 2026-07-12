@@ -7,11 +7,16 @@ import { extractWikiLinks } from "@/lib/wiki-links";
 import { deletePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EditSourceBadge } from "@/components/EditSourceBadge";
+import { LikeButton } from "@/components/LikeButton";
+import { getLikeState } from "@/lib/likes";
+import { listComments } from "@/lib/comments";
+import { deleteComment } from "@/actions/comments";
+import { CommentForm } from "@/components/CommentForm";
 
 export default async function PageView({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
   const { spaceKey, slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const { space, role } = await requireSpaceRole(spaceKey, "viewer");
+  const { session, space, role } = await requireSpaceRole(spaceKey, "viewer");
   const canEdit = hasRole(role, "editor");
 
   const page = await prisma.page.findUnique({
@@ -37,6 +42,9 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
     );
   }
 
+  const likeState = await getLikeState(page.id, session.userId);
+  const comments = await listComments(page.id);
+  const canModerate = hasRole(role, "admin");
   const targets = extractWikiLinks(page.content).map((l) => l.slug);
   const existing = targets.length
     ? await prisma.page.findMany({
@@ -66,6 +74,9 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
             마지막 수정 {page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
             <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
           </p>
+          <div className="mt-3">
+            <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
+          </div>
         </div>
         {canEdit && (
           <div className="flex shrink-0 gap-2">
@@ -96,6 +107,38 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
           </ul>
         </aside>
       )}
+
+      <section className="mt-12 border-t pt-6">
+        <h2 className="section-title">
+          댓글{comments.length > 0 && <span className="faint"> {comments.length}</span>}
+        </h2>
+        <ul className="comment-list mt-4">
+          {comments.map((c) => (
+            <li key={c.id} className="comment">
+              <div className="comment__head">
+                <span className="comment__author">{c.authorName}</span>
+                <span className="comment__time">
+                  {c.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                </span>
+                {(c.authorId === session.userId || canModerate) && (
+                  <form action={deleteComment.bind(null, spaceKey, slug, c.id)} className="comment__del">
+                    <ConfirmSubmitButton message="이 댓글을 삭제할까요?" className="comment__del-btn">
+                      삭제
+                    </ConfirmSubmitButton>
+                  </form>
+                )}
+              </div>
+              <p className="comment__body">{c.body}</p>
+            </li>
+          ))}
+          {comments.length === 0 && (
+            <li className="muted text-sm">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</li>
+          )}
+        </ul>
+        <div className="mt-6">
+          <CommentForm spaceKey={spaceKey} slug={slug} />
+        </div>
+      </section>
     </main>
   );
 }

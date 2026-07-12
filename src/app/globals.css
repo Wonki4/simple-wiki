@@ -552,6 +552,103 @@ mark {
   vertical-align: middle;
   white-space: nowrap;
 }
+
+/* 좋아요 버튼 */
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.like-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.like-btn__icon {
+  font-size: 0.98rem;
+  line-height: 1;
+}
+.like-btn--on {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.like-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* 헤더 사용자 이름 → 마이페이지 링크 */
+.userbar__name {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.userbar__name:hover {
+  color: var(--accent-strong);
+}
+
+/* 댓글 */
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+.comment__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.comment__author {
+  font-weight: 650;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.comment__time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+.comment__del {
+  margin-left: auto;
+}
+.comment__del-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--faint);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.comment__del-btn:hover {
+  color: var(--danger);
+}
+.comment__body {
+  margin-top: 0.3rem;
+  color: var(--ink-2);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-form__input {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.5rem;
+  font-family: var(--font-sans);
+}
+.comment-form__actions {
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: flex-end;
+}
 .muted {
   color: var(--muted);
 }
@@ -676,6 +773,13 @@ mark {
 .wysiwyg .milkdown .ProseMirror h2 { font-size: 1.2rem; font-weight: 650; }
 .wysiwyg .milkdown .ProseMirror h3 { font-size: 1.05rem; font-weight: 600; }
 .wysiwyg .milkdown .ProseMirror code { font-family: var(--font-mono); }
+/* 빈 제목 블록 등에서 플레이스홀더가 블록 폰트(제목 크기·굵기)를 물려받아 커지는 것 방지 */
+.wysiwyg .milkdown .crepe-placeholder::before {
+  font-size: 0.98rem;
+  font-weight: 400;
+  line-height: 1.72;
+  letter-spacing: normal;
+}
 
 /* ── Prose (rendered markdown) ────────────────────────────────── */
 .prose-wiki {
