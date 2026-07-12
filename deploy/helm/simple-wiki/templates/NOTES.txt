@@ -1,0 +1,29 @@
+simple-wiki 배포 완료: {{ include "simple-wiki.fullname" . }} (namespace: {{ .Release.Namespace }})
+
+앱 접속:
+{{- if .Values.ingress.enabled }}
+  https://{{ .Values.ingress.host }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "simple-wiki.appServiceName" . }} 3000:{{ .Values.service.port }}
+  → http://localhost:3000
+{{- end }}
+{{- if .Values.mcp.enabled }}
+
+원격 MCP:
+{{- if .Values.mcp.ingress.enabled }}
+  https://{{ .Values.mcp.ingress.host }}/mcp   (헤더: Authorization: Bearer <PAT>)
+{{- else }}
+  클러스터 내부 서비스 svc/{{ include "simple-wiki.mcpName" . }}:{{ .Values.mcp.service.port }} 의 /mcp
+{{- end }}
+  Claude Code 예: claude mcp add --transport http simple-wiki https://<mcp-host>/mcp --header "Authorization: Bearer swk_..."
+{{- end }}
+
+배포 전 체크리스트:
+  1) config.authUrl / config.keycloakIssuer 를 실제 외부 URL로 설정
+  2) 비밀값: secrets.authSecret(openssl rand -base64 32) / secrets.databaseUrl / secrets.keycloakSecret
+     (또는 secrets.existingSecret 로 외부 관리 Secret 참조)
+  3) 외부 Keycloak realm(simple-wiki)·client(simple-wiki-app)의 redirectUris 에 authUrl 등록
+{{- if gt (int .Values.app.replicaCount) 1 }}
+  4) 주의: app.replicaCount={{ .Values.app.replicaCount }} 인데 persistence.accessMode={{ .Values.persistence.accessMode }} 입니다.
+     첨부파일을 여러 파드가 공유하려면 ReadWriteMany 볼륨이 필요합니다(디스크 저장 한계).
+{{- end }}

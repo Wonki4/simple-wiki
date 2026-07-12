@@ -1,0 +1,117 @@
+# simple-wiki Helm 값. Postgres·Keycloak은 외부(관리형/기존) 사용을 전제한다.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: simple-wiki
+  tag: "latest"
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+app:
+  replicaCount: 1
+  podAnnotations: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: wiki.example.com
+  tls:
+    enabled: false
+    secretName: ""
+
+# 비밀 아닌 앱 설정
+config:
+  # Auth.js가 사용하는 앱의 공개 URL
+  authUrl: "https://wiki.example.com"
+  keycloakId: "simple-wiki-app"
+  # 외부 Keycloak realm issuer (브라우저·서버 모두 접근 가능한 URL)
+  keycloakIssuer: "https://auth.example.com/realms/simple-wiki"
+  attachmentsDir: "/data/attachments"
+
+# 비밀값. 운영은 existingSecret 권장(외부 시크릿 관리와 연동).
+secrets:
+  create: true
+  existingSecret: ""        # 지정 시 차트는 Secret을 만들지 않고 이 이름을 참조
+  authSecret: ""            # openssl rand -base64 32
+  databaseUrl: "postgresql://wiki:wiki@postgres.default.svc:5432/wiki"
+  keycloakSecret: "dev-only-secret"
+  keys:                     # Secret 안의 키 이름(existingSecret도 동일 키를 가져야 함)
+    authSecret: AUTH_SECRET
+    databaseUrl: DATABASE_URL
+    keycloakSecret: AUTH_KEYCLOAK_SECRET
+
+# 첨부파일 디스크 저장. replicaCount>1 이면 accessMode를 ReadWriteMany로.
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+# 배포 전에 prisma migrate deploy 실행(Helm pre-install/pre-upgrade Job)
+migrations:
+  enabled: true
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+# 원격 MCP 서버(streamable-http). 각 LLM이 자기 PAT를 헤더로 붙여 인증.
+mcp:
+  enabled: true
+  image:
+    repository: simple-wiki-mcp
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  wikiBaseUrl: ""           # 비우면 클러스터 내부 앱 서비스로 자동 연결
+  allowedHosts: ""          # DNS 리바인딩 보호(쉼표구분 Host). 공개 노출 시 권장.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3333
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: mcp.example.com
+    tls:
+      enabled: false
+      secretName: ""
