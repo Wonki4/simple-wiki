@@ -142,3 +142,54 @@ test("검색 권한 격리: 비권한자에겐 제한 스페이스 문서가 검
   await expect(bob.getByRole("link", { name: "검색격리 테스트" })).toHaveCount(0);
   await bobContext.close();
 });
+
+test("API 낙관적 잠금: stale expectedVersion은 409", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  const slug = `lock-test-${Date.now()}`;
+
+  const result = await page.evaluate(async (slug) => {
+    const title = `잠금테스트 ${slug}`;
+    // 생성
+    const create = await fetch("/api/spaces/eng/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content: "처음" }),
+    });
+    const created = await create.json();
+    const realSlug = created.slug as string;
+
+    // 현재 버전 확인
+    const g1 = await fetch(`/api/spaces/eng/pages/${realSlug}`);
+    const p1 = await g1.json();
+
+    // 올바른 expectedVersion으로 수정 → 200
+    const ok = await fetch(`/api/spaces/eng/pages/${realSlug}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content: "두번째", expectedVersion: p1.version }),
+    });
+
+    // 같은(이제 stale) 버전으로 다시 수정 → 409
+    const stale = await fetch(`/api/spaces/eng/pages/${realSlug}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content: "세번째", expectedVersion: p1.version }),
+    });
+    const staleBody = await stale.json();
+
+    // 정리
+    await fetch(`/api/spaces/eng/pages/${realSlug}`, { method: "DELETE" });
+
+    return {
+      firstVersion: p1.version,
+      okStatus: ok.status,
+      staleStatus: stale.status,
+      currentVersion: staleBody.currentVersion,
+    };
+  }, slug);
+
+  expect(result.firstVersion).toBe(1);
+  expect(result.okStatus).toBe(200);
+  expect(result.staleStatus).toBe(409);
+  expect(result.currentVersion).toBe(2);
+});

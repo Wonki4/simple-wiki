@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
+import { assertExpectedVersion, isVersionConflict, PageConflictError } from "@/lib/page-edits";
 
 // 페이지 본문의 [[위키링크]]를 파싱해 PageLink를 재생성한다(백링크/red link 판별용).
 async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: string, content: string) {
@@ -14,9 +15,55 @@ async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: 
   }
 }
 
-async function nextVersion(tx: Prisma.TransactionClient, pageId: string): Promise<number> {
-  const last = await tx.pageRevision.aggregate({ where: { pageId }, _max: { version: true } });
-  return (last._max.version ?? 0) + 1;
+// 페이지 본문 교체를 한 트랜잭션으로 커밋한다: Page 갱신 + 새 리비전 + 링크 동기화.
+// 경합(같은 다음 version을 동시에 쓰는 경우)은 (pageId, version) 유니크 위반으로 감지해
+// PageConflictError로 번역한다. 반환값은 새로 만들어진 버전 번호.
+async function commitRevision(input: {
+  page: { id: string; version: number; spaceId: string };
+  title: string;
+  content: string;
+  authorId: string;
+  source: EditSource;
+  viaLabel: string | null;
+}): Promise<number> {
+  const nextV = input.page.version + 1;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.page.update({
+        where: { id: input.page.id },
+        data: {
+          title: input.title,
+          content: input.content,
+          version: nextV,
+          updatedById: input.authorId,
+          updatedSource: input.source,
+          updatedViaLabel: input.viaLabel,
+        },
+      });
+      await tx.pageRevision.create({
+        data: {
+          pageId: input.page.id,
+          version: nextV,
+          title: input.title,
+          content: input.content,
+          authorId: input.authorId,
+          source: input.source,
+          viaLabel: input.viaLabel,
+        },
+      });
+      await syncLinks(tx, input.page.id, input.page.spaceId, input.content);
+    });
+  } catch (e) {
+    if (isVersionConflict(e)) {
+      const fresh = await prisma.page.findUnique({
+        where: { id: input.page.id },
+        select: { version: true },
+      });
+      throw new PageConflictError(fresh?.version ?? nextV);
+    }
+    throw e;
+  }
+  return nextV;
 }
 
 export type EditSource = "web" | "api";
@@ -77,9 +124,10 @@ export async function createPageInSpace(
 /**
  * 기존 페이지 수정. 제목이 바뀌어도 slug는 유지한다(링크 안정성).
  * 저장할 때마다 새 리비전 스냅샷을 남긴다. 페이지가 없으면 false.
+ * expectedVersion이 주어지면 현재 버전과 다를 때 PageConflictError를 던진다.
  */
 export async function updatePageInSpace(
-  input: WritePageInput & { slug: string },
+  input: WritePageInput & { slug: string; expectedVersion?: number },
 ): Promise<boolean> {
   const title = input.title.trim();
   if (!title) throw new Error("제목을 입력하세요.");
@@ -89,32 +137,15 @@ export async function updatePageInSpace(
   });
   if (!page) return false;
 
-  const source = input.source ?? "web";
-  const viaLabel = input.viaLabel ?? null;
+  assertExpectedVersion(page.version, input.expectedVersion);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.page.update({
-      where: { id: page.id },
-      data: {
-        title,
-        content: input.content,
-        updatedById: input.authorId,
-        updatedSource: source,
-        updatedViaLabel: viaLabel,
-      },
-    });
-    await tx.pageRevision.create({
-      data: {
-        pageId: page.id,
-        version: await nextVersion(tx, page.id),
-        title,
-        content: input.content,
-        authorId: input.authorId,
-        source,
-        viaLabel,
-      },
-    });
-    await syncLinks(tx, page.id, input.spaceId, input.content);
+  await commitRevision({
+    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    title,
+    content: input.content,
+    authorId: input.authorId,
+    source: input.source ?? "web",
+    viaLabel: input.viaLabel ?? null,
   });
 
   return true;

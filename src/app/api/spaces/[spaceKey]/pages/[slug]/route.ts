@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireApiSpaceRole } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { updatePageInSpace } from "@/lib/pages";
+import { PageConflictError } from "@/lib/page-edits";
 
 // GET /api/spaces/{spaceKey}/pages/{slug} — 페이지 마크다운 원문
 export async function GET(
@@ -15,7 +16,7 @@ export async function GET(
 
   const page = await prisma.page.findUnique({
     where: { spaceId_slug: { spaceId: auth.space.id, slug } },
-    select: { slug: true, title: true, content: true, updatedAt: true },
+    select: { slug: true, title: true, content: true, version: true, updatedAt: true },
   });
   if (!page) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
 
@@ -24,6 +25,7 @@ export async function GET(
     slug: page.slug,
     title: page.title,
     content: page.content,
+    version: page.version,
     updatedAt: page.updatedAt,
   });
 }
@@ -39,7 +41,7 @@ export async function PUT(
   const auth = await requireApiSpaceRole(req, spaceKey, "editor");
   if (!auth.ok) return auth.response;
 
-  let body: { title?: unknown; content?: unknown };
+  let body: { title?: unknown; content?: unknown; expectedVersion?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -47,6 +49,8 @@ export async function PUT(
   }
   const title = typeof body.title === "string" ? body.title : "";
   const content = typeof body.content === "string" ? body.content : "";
+  const expectedVersion =
+    typeof body.expectedVersion === "number" ? body.expectedVersion : undefined;
 
   let found: boolean;
   try {
@@ -58,16 +62,28 @@ export async function PUT(
       authorId: auth.actor.userId,
       source: auth.actor.via === "token" ? "api" : "web",
       viaLabel: auth.actor.via === "token" ? auth.actor.tokenName : null,
+      expectedVersion,
     });
   } catch (e) {
+    if (e instanceof PageConflictError) {
+      return Response.json(
+        { error: "페이지가 그사이 변경되었습니다.", currentVersion: e.currentVersion },
+        { status: 409 },
+      );
+    }
     return Response.json({ error: e instanceof Error ? e.message : "수정 실패" }, { status: 400 });
   }
   if (!found) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
 
+  const saved = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: auth.space.id, slug } },
+    select: { version: true },
+  });
   return Response.json({
     space: { key: auth.space.key },
     slug,
     title: title.trim(),
+    version: saved?.version,
     url: `/s/${spaceKey}/${encodeURIComponent(slug)}`,
   });
 }
