@@ -30,7 +30,11 @@ export function LikeButton({ spaceKey, slug, count, liked }: Props) {
       onClick={() =>
         startTransition(async () => {
           setOptimistic(!state.liked);
-          await toggleLike(spaceKey, slug);
+          try {
+            await toggleLike(spaceKey, slug);
+          } catch {
+            // 토글 실패가 에러 페이지로 번지지 않게(다음 로드에서 실제 상태로 보정)
+          }
         })
       }
     >

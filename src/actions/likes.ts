@@ -13,13 +13,15 @@ export async function toggleLike(spaceKey: string, slug: string) {
   });
   if (!page) return;
 
-  const existing = await prisma.like.findUnique({
-    where: { userId_pageId: { userId: session.userId, pageId: page.id } },
+  // 멱등적 토글: 삭제(없어도 무해) → 지운 게 없으면 생성(경쟁으로 중복이면 무시).
+  // find-then-mutate의 race에서 delete/create가 예외를 던져 에러 페이지로 번지는 것을 막는다.
+  const removed = await prisma.like.deleteMany({
+    where: { userId: session.userId, pageId: page.id },
   });
-  if (existing) {
-    await prisma.like.delete({ where: { id: existing.id } });
-  } else {
-    await prisma.like.create({ data: { userId: session.userId, pageId: page.id } });
+  if (removed.count === 0) {
+    await prisma.like
+      .create({ data: { userId: session.userId, pageId: page.id } })
+      .catch(() => {}); // 동시 요청으로 이미 생성됐으면 무시
   }
 
   revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
