@@ -133,13 +133,61 @@ mark {
   position: sticky;
   top: var(--masthead-h);
   height: calc(100vh - var(--masthead-h));
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 내부 문서목록 영역만 스크롤 */
   border-right: 1px solid var(--border);
-  padding: 1.25rem 0.85rem 2rem;
   background: color-mix(in srgb, var(--surface) 55%, var(--bg));
 }
-.lnb__section + .lnb__section {
-  margin-top: 1.6rem;
+/* 상단 고정: 스페이스 목록 */
+.lnb__top {
+  flex: none;
+  padding: 1.25rem 0.85rem 0.75rem;
+}
+/* 남은 공간을 채우는 현재 스페이스 문서 영역 */
+.lnb__docs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+/* 라벨 + 필터: 고정 */
+.lnb__docs-head {
+  flex: none;
+  padding: 0 0.85rem;
+}
+/* 문서 목록: 여기만 스크롤 */
+.lnb__docs-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.35rem 0.85rem 0.5rem;
+}
+/* 하단 고정: 새 문서 / 스페이스 설정 */
+.lnb__bottom {
+  flex: none;
+  padding: 0.5rem 0.85rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.lnb__filter {
+  width: 100%;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 0.3rem 0.55rem;
+}
+.lnb__filter::placeholder {
+  color: var(--faint);
+}
+.lnb__filter:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 .lnb__label {
   font-family: var(--font-mono);
@@ -648,6 +696,44 @@ mark {
   margin-top: 0.6rem;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 탭 (마이페이지 활동) */
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.5rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab__count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+.tab--active .tab__count {
+  color: var(--accent-strong);
 }
 .muted {
   color: var(--muted);

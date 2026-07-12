@@ -39,7 +39,12 @@ export default async function HistoryPage({ params }: { params: Promise<{ spaceK
               >
                 v{r.version}
               </Link>
-              <span className="text-sm" style={{ color: "var(--ink-2)" }}>{r.title}</span>
+              <Link
+                href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history/${r.version}`}
+                className="title-link text-sm"
+              >
+                {r.title}
+              </Link>
             </span>
             <span className="meta">
               {authorName.get(r.authorId) ?? r.authorId} · {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
