@@ -18,6 +18,15 @@ function cleanMarkdown(md: string): string {
   return md.replace(/\\\[/g, "[").replace(/\\\]/g, "]");
 }
 
+// Next.js의 redirect()/notFound()는 제어 흐름을 위해 특수 에러를 throw한다.
+// 저장 성공 후 redirect가 이 에러를 던지는데, 이를 catch로 삼키면 실제로는 성공인데도
+// "저장 실패" 알림이 뜬다. 이 에러는 다시 던져 프레임워크가 이동을 처리하게 한다.
+function isRouterControlFlowError(e: unknown): boolean {
+  if (typeof e !== "object" || e === null || !("digest" in e)) return false;
+  const digest = (e as { digest: unknown }).digest;
+  return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND");
+}
+
 export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
@@ -42,7 +51,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave 
         },
         featureConfigs: {
           [Crepe.Feature.Placeholder]: {
-            text: "여기에 입력하세요. '/' 를 누르면 블록을 삽입할 수 있고, '# '·'- '처럼 마크다운을 치면 바로 렌더링됩니다.",
+            text: "여기에 입력하세요.  '/' 로 블록 삽입",
             mode: "block",
           },
           [Crepe.Feature.ImageBlock]: {
@@ -91,10 +100,12 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave 
         setSaving(true);
         try {
           await onSave(fd);
-        } catch {
-          alert("저장에 실패했습니다. 잠시 후 다시 시도하세요.");
-        } finally {
+        } catch (e) {
+          // redirect()/notFound()의 제어 흐름 에러는 성공 신호다. 알림 없이 넘겨서
+          // 서버 주도 이동이 진행되게 한다(다시 throw하면 이동이 취소됨).
+          if (isRouterControlFlowError(e)) return;
           setSaving(false);
+          alert("저장에 실패했습니다. 잠시 후 다시 시도하세요.");
         }
       }}
     >
