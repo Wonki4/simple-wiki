@@ -48,9 +48,11 @@ config:
 secrets:
   create: true
   existingSecret: ""        # 지정 시 차트는 Secret을 만들지 않고 이 이름을 참조
+  # 아래 3개는 필수(비우면 helm install이 required로 실패 — 안전한 기본값 없음).
+  # 운영은 secrets.create=false + existingSecret 권장.
   authSecret: ""            # openssl rand -base64 32
-  databaseUrl: "postgresql://wiki:wiki@postgres.default.svc:5432/wiki"
-  keycloakSecret: "dev-only-secret"
+  databaseUrl: ""           # 외부 Postgres 접속 URL (예: postgresql://user:pass@host:5432/wiki)
+  keycloakSecret: ""        # 외부 Keycloak client 시크릿
   keys:                     # Secret 안의 키 이름(existingSecret도 동일 키를 가져야 함)
     authSecret: AUTH_SECRET
     databaseUrl: DATABASE_URL

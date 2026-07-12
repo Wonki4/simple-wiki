@@ -15,8 +15,12 @@ export default async function HistoryPage({ params }: { params: Promise<{ spaceK
   if (!page) notFound();
 
   const authorIds = [...new Set(page.revisions.map((r) => r.authorId))];
-  const authors = await prisma.user.findMany({ where: { id: { in: authorIds } } });
-  const authorName = new Map(authors.map((u) => [u.id, u.name || u.email]));
+  const authors = await prisma.user.findMany({
+    where: { id: { in: authorIds } },
+    select: { id: true, name: true },
+  });
+  // 이메일 폴백 제거(열람자에게 PII 노출 방지) — 표시 이름만.
+  const authorName = new Map(authors.map((u) => [u.id, u.name?.trim() || "알 수 없음"]));
 
   return (
     <main className="py-10">

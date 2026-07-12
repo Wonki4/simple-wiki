@@ -1,5 +1,10 @@
-# 풀스택 셀프호스트: 앱 + Postgres + Keycloak + MCP 를 한 번에 띄운다.
+# 풀스택 셀프호스트/데모: 앱 + Postgres + Keycloak + MCP 를 한 번에 띄운다.
 #   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# ⚠ 보안: 아래 기본값은 로컬 데모용이다(약한 비밀번호). 반드시 .env.prod 를 채워 덮어쓸 것.
+#   - AUTH_SECRET 은 필수(미설정 시 기동 거부). POSTGRES/KEYCLOAK 비밀번호는 강한 값으로 교체.
+#   - 번들 Keycloak은 start-dev(비운영). 실서비스는 deploy/ 의 Helm + 외부 Keycloak(프로덕션 모드) 사용.
+#   - postgres 포트는 호스트에 노출하지 않는다(컨테이너 네트워크 내부 전용).
 #
 # 브라우저 로그인 리다이렉트를 위해 호스트에 아래 한 줄이 필요하다(issuer 호스트 공유):
 #   127.0.0.1 keycloak
