@@ -119,6 +119,8 @@ model Page {
   // 마지막 편집 출처: "web"(사람, 브라우저) | "api"(개인 액세스 토큰 = 봇/LLM)
   updatedSource   String                @default("web")
   updatedViaLabel String?               // api일 때 토큰 이름(예: "Claude Desktop")
+  // 낙관적 잠금·이력용 현재 버전. 항상 최신 PageRevision.version과 같다.
+  version         Int                   @default(1)
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
   revisions    PageRevision[]
