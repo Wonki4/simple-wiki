@@ -251,3 +251,78 @@ test("API 부분 편집: append와 replace(1곳/모호)", async ({ page }) => {
   expect(result.replaced).toBe("alpha BRAVO charlie");
   expect(result.ambStatus).toBe(422);
 });
+
+test("API 이력/되돌리기: revisions 목록 + revert로 과거 내용 복원", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  const tag = `revert-${Date.now()}`;
+
+  const result = await page.evaluate(async (tag) => {
+    const create = await fetch("/api/spaces/eng/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `되돌리기 ${tag}`, content: "원본 내용" }),
+    });
+    const slug = (await create.json()).slug as string;
+
+    // v2로 수정
+    await fetch(`/api/spaces/eng/pages/${slug}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `되돌리기 ${tag}`, content: "바뀐 내용" }),
+    });
+
+    const histRes = await fetch(`/api/spaces/eng/pages/${slug}/revisions`);
+    const hist = await histRes.json();
+
+    // v1으로 revert
+    const rev = await fetch(`/api/spaces/eng/pages/${slug}/revert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: 1 }),
+    });
+    const revBody = await rev.json();
+
+    const after = await (await fetch(`/api/spaces/eng/pages/${slug}`)).json();
+
+    await fetch(`/api/spaces/eng/pages/${slug}`, { method: "DELETE" });
+    return {
+      histCount: hist.revisions.length,
+      revStatus: rev.status,
+      revVersion: revBody.version,
+      afterContent: after.content,
+    };
+  }, tag);
+
+  expect(result.histCount).toBe(2);
+  expect(result.revStatus).toBe(200);
+  expect(result.revVersion).toBe(3); // 전진형: v1 내용이 v3으로 기록
+  expect(result.afterContent).toBe("원본 내용");
+});
+
+test("웹 복원: 리비전 상세에서 '이 버전으로 복원'", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  const tag = `webrestore-${Date.now()}`;
+  const slug = await page.evaluate(async (tag) => {
+    const c = await fetch("/api/spaces/eng/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `웹복원 ${tag}`, content: "웹 원본" }),
+    });
+    const s = (await c.json()).slug as string;
+    await fetch(`/api/spaces/eng/pages/${s}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `웹복원 ${tag}`, content: "웹 수정본" }),
+    });
+    return s;
+  }, tag);
+
+  page.on("dialog", (d) => d.accept()); // ConfirmSubmitButton confirm 수락
+  await page.goto(`/s/eng/${slug}/history/1`);
+  await page.getByRole("button", { name: "이 버전으로 복원" }).click();
+  await expect(page.getByText("웹 원본")).toBeVisible();
+
+  await page.evaluate(async (s) => {
+    await fetch(`/api/spaces/eng/pages/${s}`, { method: "DELETE" });
+  }, slug);
+});

@@ -16,9 +16,33 @@ export async function GET(
 
   const page = await prisma.page.findUnique({
     where: { spaceId_slug: { spaceId: auth.space.id, slug } },
-    select: { slug: true, title: true, content: true, version: true, updatedAt: true },
+    select: { id: true, slug: true, title: true, content: true, version: true, updatedAt: true },
   });
   if (!page) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
+
+  // ?version=N — 특정 리비전 원문
+  const versionParam = req.nextUrl.searchParams.get("version");
+  if (versionParam !== null) {
+    const version = Number(versionParam);
+    if (!Number.isInteger(version) || version < 1) {
+      return Response.json({ error: "version이 올바르지 않습니다." }, { status: 400 });
+    }
+    const rev = await prisma.pageRevision.findUnique({
+      where: { pageId_version: { pageId: page.id, version } },
+      select: { version: true, title: true, content: true, source: true, viaLabel: true, createdAt: true },
+    });
+    if (!rev) return Response.json({ error: "해당 버전이 없습니다." }, { status: 404 });
+    return Response.json({
+      space: { key: auth.space.key, name: auth.space.name },
+      slug: page.slug,
+      title: rev.title,
+      content: rev.content,
+      version: rev.version,
+      source: rev.source,
+      viaLabel: rev.viaLabel,
+      createdAt: rev.createdAt,
+    });
+  }
 
   return Response.json({
     space: { key: auth.space.key, name: auth.space.name },

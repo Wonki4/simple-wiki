@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSpaceRole } from "@/lib/access";
-import { createPageInSpace, updatePageInSpace } from "@/lib/pages";
+import { createPageInSpace, updatePageInSpace, revertPage } from "@/lib/pages";
 
 export async function createPage(spaceKey: string, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
@@ -54,15 +54,17 @@ export async function deletePage(spaceKey: string, slug: string) {
 }
 
 export async function restoreRevision(spaceKey: string, slug: string, version: number) {
-  const { space } = await requireSpaceRole(spaceKey, "editor");
-  const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+  const { session, space } = await requireSpaceRole(spaceKey, "editor");
+  const result = await revertPage({
+    spaceId: space.id,
+    slug,
+    version,
+    authorId: session.userId,
   });
-  if (!page) throw new Error("페이지가 없습니다.");
-  const rev = await prisma.pageRevision.findUnique({
-    where: { pageId_version: { pageId: page.id, version } },
-  });
-  if (!rev) throw new Error("해당 버전이 없습니다.");
-  await saveRevision(spaceKey, slug, rev.title, rev.content);
+  if (!result.found) throw new Error("페이지가 없습니다.");
+  if (result.missingRevision) throw new Error("해당 버전이 없습니다.");
+
+  revalidatePath(`/s/${spaceKey}`);
+  revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }

@@ -207,3 +207,40 @@ export function replaceInPage(
 ): Promise<{ found: boolean; version?: number }> {
   return editPageContent(input, (current) => applyReplace(current, input.oldString, input.newString));
 }
+
+/**
+ * 과거 리비전 vN의 title+content를 새 리비전으로 전진 복원한다(이력 삭제 없음).
+ * 페이지 없음 → { found: false }. 해당 버전 없음 → { found: true, missingRevision: true }.
+ * expectedVersion이 주어지면 현재 버전과 다를 때 PageConflictError.
+ */
+export async function revertPage(input: {
+  spaceId: string;
+  slug: string;
+  version: number;
+  authorId: string;
+  source?: EditSource;
+  viaLabel?: string | null;
+  expectedVersion?: number;
+}): Promise<{ found: boolean; missingRevision?: boolean; version?: number }> {
+  const page = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+  });
+  if (!page) return { found: false };
+
+  const rev = await prisma.pageRevision.findUnique({
+    where: { pageId_version: { pageId: page.id, version: input.version } },
+  });
+  if (!rev) return { found: true, missingRevision: true };
+
+  assertExpectedVersion(page.version, input.expectedVersion);
+
+  const version = await commitRevision({
+    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    title: rev.title,
+    content: rev.content,
+    authorId: input.authorId,
+    source: input.source ?? "web",
+    viaLabel: input.viaLabel ?? null,
+  });
+  return { found: true, version };
+}
