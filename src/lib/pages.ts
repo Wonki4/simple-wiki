@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
+import { invalidatePageCache } from "@/lib/page-render-cache";
 import {
   appendContent,
   applyReplace,
@@ -86,6 +87,7 @@ async function commitRevision(input: {
     }
     throw e;
   }
+  invalidatePageCache(input.page.id);
   return nextV;
 }
 
