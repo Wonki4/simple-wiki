@@ -193,3 +193,61 @@ test("API 낙관적 잠금: stale expectedVersion은 409", async ({ page }) => {
   expect(result.staleStatus).toBe(409);
   expect(result.currentVersion).toBe(2);
 });
+
+test("API 부분 편집: append와 replace(1곳/모호)", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  const tag = `edit-${Date.now()}`;
+
+  const result = await page.evaluate(async (tag) => {
+    const mk = async (title: string, content: string) => {
+      const r = await fetch("/api/spaces/eng/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content }),
+      });
+      return (await r.json()).slug as string;
+    };
+    const read = async (slug: string) => {
+      const r = await fetch(`/api/spaces/eng/pages/${slug}`);
+      return (await r.json()).content as string;
+    };
+
+    // append
+    const a = await mk(`append ${tag}`, "첫 줄");
+    await fetch(`/api/spaces/eng/pages/${a}/append`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "둘째 줄" }),
+    });
+    const appended = await read(a);
+
+    // replace 1곳
+    const b = await mk(`replace ${tag}`, "alpha bravo charlie");
+    const rep = await fetch(`/api/spaces/eng/pages/${b}/replace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_string: "bravo", new_string: "BRAVO" }),
+    });
+    const replaced = await read(b);
+
+    // replace 모호(2곳) → 422
+    const c = await mk(`ambiguous ${tag}`, "dup and dup");
+    const amb = await fetch(`/api/spaces/eng/pages/${c}/replace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_string: "dup", new_string: "X" }),
+    });
+
+    // 정리
+    for (const s of [a, b, c]) {
+      await fetch(`/api/spaces/eng/pages/${s}`, { method: "DELETE" });
+    }
+    return { appended, repStatus: rep.status, replaced, ambStatus: amb.status };
+  }, tag);
+
+  expect(result.appended).toContain("첫 줄");
+  expect(result.appended).toContain("둘째 줄");
+  expect(result.repStatus).toBe(200);
+  expect(result.replaced).toBe("alpha BRAVO charlie");
+  expect(result.ambStatus).toBe(422);
+});

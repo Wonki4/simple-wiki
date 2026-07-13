@@ -2,7 +2,13 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
-import { assertExpectedVersion, isVersionConflict, PageConflictError } from "@/lib/page-edits";
+import {
+  appendContent,
+  applyReplace,
+  assertExpectedVersion,
+  isVersionConflict,
+  PageConflictError,
+} from "@/lib/page-edits";
 
 // 페이지 본문의 [[위키링크]]를 파싱해 PageLink를 재생성한다(백링크/red link 판별용).
 async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: string, content: string) {
@@ -149,4 +155,55 @@ export async function updatePageInSpace(
   });
 
   return true;
+}
+
+export type EditActionInput = {
+  spaceId: string;
+  slug: string;
+  authorId: string;
+  source?: EditSource;
+  viaLabel?: string | null;
+  expectedVersion?: number;
+};
+
+/**
+ * 현재 본문을 읽어 transform을 적용한 뒤 커밋한다(부분 편집의 공통 경로).
+ * 제목은 유지한다. transform은 위반 시 throw할 수 있다(예: ReplaceError).
+ * 페이지가 없으면 { found: false }.
+ */
+export async function editPageContent(
+  input: EditActionInput,
+  transform: (current: string) => string,
+): Promise<{ found: boolean; version?: number }> {
+  const page = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+  });
+  if (!page) return { found: false };
+
+  assertExpectedVersion(page.version, input.expectedVersion);
+  const newContent = transform(page.content); // 위반 시 여기서 throw
+
+  const version = await commitRevision({
+    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    title: page.title,
+    content: newContent,
+    authorId: input.authorId,
+    source: input.source ?? "api",
+    viaLabel: input.viaLabel ?? null,
+  });
+  return { found: true, version };
+}
+
+// 본문 끝에 content를 덧붙인다.
+export function appendToPage(
+  input: EditActionInput & { content: string },
+): Promise<{ found: boolean; version?: number }> {
+  return editPageContent(input, (current) => appendContent(current, input.content));
+}
+
+// oldString을 정확히 1곳에서 newString으로 치환한다(0곳/2곳↑는 ReplaceError).
+export function replaceInPage(
+  input: EditActionInput & { oldString: string; newString: string },
+): Promise<{ found: boolean; version?: number }> {
+  return editPageContent(input, (current) => applyReplace(current, input.oldString, input.newString));
 }
