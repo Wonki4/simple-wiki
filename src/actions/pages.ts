@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSpaceRole } from "@/lib/access";
 import { createPageInSpace, updatePageInSpace, revertPage } from "@/lib/pages";
+import { PageConflictError } from "@/lib/page-edits";
 
 export async function createPage(spaceKey: string, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
@@ -24,25 +25,38 @@ export async function createPage(spaceKey: string, formData: FormData) {
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }
 
-async function saveRevision(spaceKey: string, slug: string, title: string, content: string): Promise<void> {
+export type SaveResult = { conflict: true; currentVersion: number } | void;
+
+export async function updatePage(
+  spaceKey: string,
+  slug: string,
+  formData: FormData,
+): Promise<SaveResult> {
+  const title = String(formData.get("title") ?? "").trim();
+  const content = String(formData.get("content") ?? "");
+  const ev = formData.get("expectedVersion");
+  const expectedVersion = typeof ev === "string" && ev !== "" ? Number(ev) : undefined;
+
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
-  const found = await updatePageInSpace({
-    spaceId: space.id,
-    slug,
-    title,
-    content,
-    authorId: session.userId,
-  });
-  if (!found) throw new Error("페이지가 없습니다.");
+  try {
+    const found = await updatePageInSpace({
+      spaceId: space.id,
+      slug,
+      title,
+      content,
+      authorId: session.userId,
+      expectedVersion,
+    });
+    if (!found) throw new Error("페이지가 없습니다.");
+  } catch (e) {
+    if (e instanceof PageConflictError) {
+      return { conflict: true, currentVersion: e.currentVersion };
+    }
+    throw e;
+  }
 
   revalidatePath(`/s/${spaceKey}`);
   revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
-}
-
-export async function updatePage(spaceKey: string, slug: string, formData: FormData) {
-  const title = String(formData.get("title") ?? "").trim();
-  const content = String(formData.get("content") ?? "");
-  await saveRevision(spaceKey, slug, title, content);
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }
 

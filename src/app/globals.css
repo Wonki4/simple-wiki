@@ -790,6 +790,11 @@ mark {
   padding: 0.6rem 0.75rem;
 }
 
+/* ── Notices ───────────────────────────────────────────────────── */
+.notice { border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 0.9rem; margin-bottom: 1rem; }
+.notice-warn { background: color-mix(in oklab, var(--accent-strong) 12%, transparent); border: 1px solid color-mix(in oklab, var(--accent-strong) 35%, transparent); }
+.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-strong); text-decoration: underline; cursor: pointer; }
+
 /* ── Data table (settings) ────────────────────────────────────── */
 .dtable {
   width: 100%;

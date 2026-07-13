@@ -5,11 +5,14 @@ import type { Crepe as CrepeType } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 
+type SaveResult = { conflict: true; currentVersion: number } | void;
+
 interface Props {
   spaceKey: string;
   initialTitle: string;
   initialContent: string;
-  onSave: (formData: FormData) => Promise<void>;
+  expectedVersion?: number;
+  onSave: (formData: FormData) => Promise<SaveResult>;
 }
 
 // 마크다운 직렬화 시 리터럴 대괄호가 이스케이프(\[)될 수 있다.
@@ -27,10 +30,12 @@ function isRouterControlFlowError(e: unknown): boolean {
   return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND");
 }
 
-export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave }: Props) {
+export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expectedVersion: initialExpectedVersion, onSave }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
+  const [expectedVersion, setExpectedVersion] = useState(initialExpectedVersion);
+  const [conflict, setConflict] = useState(false);
   const holderRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<CrepeType | null>(null);
 
@@ -99,7 +104,15 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave 
         if (crepeRef.current) fd.set("content", cleanMarkdown(crepeRef.current.getMarkdown()));
         setSaving(true);
         try {
-          await onSave(fd);
+          const result = await onSave(fd);
+          if (result && "conflict" in result) {
+            // 다른 사람이 먼저 저장함 — 최신 version으로 갱신하고 배너 표시.
+            // 사용자가 다시 저장을 누르면 최신 위에 덮어쓴다(의도적 진행).
+            setExpectedVersion(result.currentVersion);
+            setConflict(true);
+            setSaving(false);
+            return;
+          }
         } catch (e) {
           // redirect()/notFound()의 제어 흐름 에러는 성공 신호다. 알림 없이 넘겨서
           // 서버 주도 이동이 진행되게 한다(다시 throw하면 이동이 취소됨).
@@ -109,6 +122,19 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave 
         }
       }}
     >
+      {conflict && (
+        <div className="notice notice-warn" role="alert">
+          다른 사람이 이 페이지를 먼저 수정했습니다(현재 v{expectedVersion}).{" "}
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => window.location.reload()}
+          >
+            최신 내용 불러오기
+          </button>
+          . 그대로 다시 저장하면 상대의 수정 위에 덮어씁니다.
+        </div>
+      )}
       <input
         name="title"
         value={title}
@@ -118,6 +144,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, onSave 
         className="input input-title"
       />
       <input type="hidden" name="content" value={content} />
+      <input type="hidden" name="expectedVersion" value={expectedVersion ?? ""} />
       <div className="wysiwyg mt-4">
         <div ref={holderRef} />
       </div>

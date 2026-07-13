@@ -10,6 +10,7 @@ export default async function EditPagePage({ params }: { params: Promise<{ space
   const { space } = await requireSpaceRole(spaceKey, "editor");
   const page = await prisma.page.findUnique({
     where: { spaceId_slug: { spaceId: space.id, slug } },
+    select: { title: true, content: true, version: true },
   });
   if (!page) notFound();
   return (
@@ -20,6 +21,7 @@ export default async function EditPagePage({ params }: { params: Promise<{ space
         spaceKey={spaceKey}
         initialTitle={page.title}
         initialContent={page.content}
+        expectedVersion={page.version}
         onSave={updatePage.bind(null, spaceKey, slug)}
       />
     </main>

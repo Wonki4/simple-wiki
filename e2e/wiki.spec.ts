@@ -326,3 +326,47 @@ test("웹 복원: 리비전 상세에서 '이 버전으로 복원'", async ({ pa
     await fetch(`/api/spaces/eng/pages/${s}`, { method: "DELETE" });
   }, slug);
 });
+
+test("웹 충돌 UX: 외부 수정 후 저장하면 충돌 배너, 재저장은 진행", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  const tag = `webconflict-${Date.now()}`;
+
+  // 페이지 생성(v1)
+  const slug = await page.evaluate(async (tag) => {
+    const c = await fetch("/api/spaces/eng/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `충돌 ${tag}`, content: "원본" }),
+    });
+    return (await c.json()).slug as string;
+  }, tag);
+
+  // 편집 화면 진입(에디터 expectedVersion=1)
+  await page.goto(`/s/eng/${slug}/edit`);
+  await page.locator(".milkdown .ProseMirror").click();
+  await page.keyboard.type(" 내 수정");
+
+  // 외부에서 먼저 저장 → v2
+  await page.evaluate(async (slug) => {
+    await fetch(`/api/spaces/eng/pages/${slug}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "외부", content: "외부 수정본" }),
+    });
+  }, slug);
+
+  // 저장 → 충돌 배너
+  // Next.js가 모든 페이지에 role="alert" 라우트 알림 요소를 자체 주입하므로
+  // (accessible name은 없음) 텍스트 내용으로 배너를 특정한다.
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "먼저 수정" })).toContainText("먼저 수정");
+
+  // 다시 저장 → 이제 expectedVersion=2라 통과, 페이지로 이동
+  // 리다이렉트 URL은 encodeURIComponent(slug)로 만들어지므로 인코딩된 형태로 비교한다.
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page).toHaveURL(new RegExp(`/s/eng/${encodeURIComponent(slug)}$`));
+
+  await page.evaluate(async (slug) => {
+    await fetch(`/api/spaces/eng/pages/${slug}`, { method: "DELETE" });
+  }, slug);
+});
