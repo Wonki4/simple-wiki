@@ -103,6 +103,12 @@ mcp:
     tag: "latest"
     pullPolicy: IfNotPresent
   replicaCount: 1
+  # mcp-server는 무상태(stateless streamable-http)라 수평 확장 가능.
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
   wikiBaseUrl: ""           # 비우면 클러스터 내부 앱 서비스로 자동 연결
   allowedHosts: ""          # DNS 리바인딩 보호(쉼표구분 Host). 공개 노출 시 권장.
   resources:
