@@ -33,7 +33,8 @@ async function runSearch(query: string, readableSpaceIds: string[]): Promise<Sea
         s."name" AS "spaceName",
         p."slug",
         p."title",
-        p."content"
+        p."content",
+        ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) AS "rank"
       FROM "Page" p
       JOIN "Space" s ON s."id" = p."spaceId"
       WHERE p."spaceId" = ANY(${readableSpaceIds})
@@ -42,9 +43,10 @@ async function runSearch(query: string, readableSpaceIds: string[]): Promise<Sea
           OR p."title" ILIKE '%' || ${query} || '%'
           OR p."content" ILIKE '%' || ${query} || '%'
         )
-      ORDER BY ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) DESC
+      ORDER BY "rank" DESC
       LIMIT 50
     ) hit
+    ORDER BY hit."rank" DESC
   `;
 }
 
