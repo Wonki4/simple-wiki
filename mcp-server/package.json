@@ -1,0 +1,40 @@
+{
+  "name": "simple-wiki-mcp",
+  "version": "1.2.0",
+  "description": "simple-wiki를 MCP 도구로 노출하는 서버 (stdio + streamable-http). Claude Desktop/Code 등에서 위키를 읽고 씁니다.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "simple-wiki-mcp": "dist/index.js",
+    "simple-wiki-mcp-http": "dist/http.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "wiki",
+    "simple-wiki",
+    "claude"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,915 @@
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────────────
+   "Engineering notebook": cool-paper neutrals, ink primary actions,
+   one restrained amber accent, IBM Plex Mono for the instrument chrome
+   (keys, timestamps, brackets, code). Content link blue / red-link red
+   stay as documented semantics. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --border: #e3e6ec;
+  --border-strong: #d2d7e0;
+
+  --ink: #15181e;
+  --ink-2: #39404b;
+  --muted: #6b7280;
+  --faint: #9aa1ac;
+
+  --primary: #1b2130;
+  --primary-hover: #2a3245;
+  --primary-ink: #ffffff;
+
+  --accent: #a45a0b;        /* burnt amber — brackets, active, focus */
+  --accent-soft: #f4e7d3;
+  --accent-strong: #c26a0d;
+
+  --link: #2563eb;          /* content links (prose) */
+  --danger: #c2321f;
+  --danger-border: #e7b7ae;
+
+  --mark-bg: #fde68a;
+  --mark-ink: #3a2c05;
+
+  --ring: color-mix(in srgb, var(--accent) 55%, transparent);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    Pretendard, "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular",
+    "JetBrains Mono", Menlo, monospace;
+
+  --radius: 9px;
+  --shadow: 0 1px 2px rgba(16, 20, 28, 0.04), 0 4px 16px rgba(16, 20, 28, 0.05);
+  --masthead-h: 57px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161b;
+    --surface: #1c1f26;
+    --surface-2: #23262e;
+    --border: #2b2f38;
+    --border-strong: #3a3f4a;
+
+    --ink: #eceef2;
+    --ink-2: #c6ccd5;
+    --muted: #8a919d;
+    --faint: #656c78;
+
+    --primary: #eceef2;
+    --primary-hover: #dfe2e8;
+    --primary-ink: #15181e;
+
+    --accent: #e6a23c;
+    --accent-soft: #3a2f1c;
+    --accent-strong: #f2b452;
+
+    --link: #7ea6ff;
+    --danger: #f0857a;
+    --danger-border: #6a3a34;
+
+    --mark-bg: #7a5c12;
+    --mark-ink: #fde7c0;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@theme inline {
+  --font-mono: var(--font-plex-mono);
+}
+
+/* ── Base ─────────────────────────────────────────────────────── */
+* {
+  border-color: var(--border);
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+a {
+  color: inherit;
+}
+mark {
+  background: var(--mark-bg);
+  color: var(--mark-ink);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.wrap {
+  max-width: 56rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+.wrap-reading {
+  max-width: 44rem;
+}
+
+/* ── Shell: 좌측 LNB + 콘텐츠 2단 ─────────────────────────────── */
+.shell {
+  display: flex;
+  align-items: flex-start;
+}
+.lnb {
+  flex: 0 0 244px;
+  width: 244px;
+  position: sticky;
+  top: var(--masthead-h);
+  height: calc(100vh - var(--masthead-h));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 내부 문서목록 영역만 스크롤 */
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+}
+/* 상단 고정: 스페이스 목록 */
+.lnb__top {
+  flex: none;
+  padding: 1.25rem 0.85rem 0.75rem;
+}
+/* 남은 공간을 채우는 현재 스페이스 문서 영역 */
+.lnb__docs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+/* 라벨 + 필터: 고정 */
+.lnb__docs-head {
+  flex: none;
+  padding: 0 0.85rem;
+}
+/* 문서 목록: 여기만 스크롤 */
+.lnb__docs-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.35rem 0.85rem 0.5rem;
+}
+/* 하단 고정: 새 문서 / 스페이스 설정 */
+.lnb__bottom {
+  flex: none;
+  padding: 0.5rem 0.85rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.lnb__filter {
+  width: 100%;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 0.3rem 0.55rem;
+}
+.lnb__filter::placeholder {
+  color: var(--faint);
+}
+.lnb__filter:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.lnb__label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 0 0.55rem;
+  margin-bottom: 0.45rem;
+}
+.lnb__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lnb__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 7px;
+  border-left: 2px solid transparent;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  transition: background 0.12s, color 0.12s;
+}
+.lnb__item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.lnb__item--active {
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-left-color: var(--accent);
+  font-weight: 500;
+}
+.lnb__key {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+.lnb__item--active .lnb__key {
+  color: var(--accent-strong);
+}
+.lnb__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lnb__add {
+  display: block;
+  padding: 0.35rem 0.55rem;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.lnb__add:hover {
+  color: var(--accent-strong);
+}
+.lnb__empty {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+.shell__content {
+  flex: 1;
+  min-width: 0;
+}
+.shell__inner {
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: 0 1.75rem;
+}
+@media (max-width: 860px) {
+  .lnb {
+    display: none;
+  }
+  .shell__inner {
+    padding: 0 1.25rem;
+  }
+  /* LNB가 사라지므로 로고 고정폭 컬럼을 풀고 자연스러운 헤더로 */
+  .masthead__inner {
+    padding: 0.5rem 1.25rem;
+    gap: 0.85rem;
+  }
+  .brand {
+    flex: none;
+    padding-left: 0;
+  }
+  .search {
+    padding-left: 0;
+  }
+}
+
+/* ── Masthead ─────────────────────────────────────────────────── */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+/* 헤더를 본문 컬럼에 정렬한다: 로고는 LNB 폭(244px) 자리, 검색은 콘텐츠 영역 */
+.masthead__inner {
+  padding: 0.5rem 1.4rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  white-space: nowrap;
+  flex: 0 0 244px;
+  box-sizing: border-box;
+  padding-left: 1.4rem;
+}
+/* 문서(page) 뱃지 — 로고의 유일한 컬러 포인트 */
+.brand__badge {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+  flex: none;
+  transition: transform 0.18s ease;
+}
+.brand:hover .brand__badge {
+  transform: scale(1.06) rotate(-3deg);
+}
+.brand__word {
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  gap: 0.28ch;
+}
+.brand__word-1 {
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.brand__word-2 {
+  font-weight: 750;
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand:hover .brand__badge { transform: none; }
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  padding-left: 1.75rem;
+}
+.search__box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 30rem;
+}
+.search__icon {
+  position: absolute;
+  left: 0.72rem;
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+  pointer-events: none;
+  transition: color 0.15s;
+}
+.search__field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 0.48rem 2.6rem 0.48rem 2.15rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.search__field::placeholder {
+  color: var(--faint);
+}
+.search__field:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.search__box:focus-within .search__icon {
+  color: var(--accent);
+}
+/* ⌘K 힌트 — 실제로 검색창을 포커스한다(SearchBox의 키 리스너) */
+.search__kbd {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.16rem 0.36rem;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.search__box:focus-within .search__kbd {
+  opacity: 0;
+}
+/* 검색 입력의 브라우저 기본 클리어 버튼 숨김(우리 ⌘K 힌트와 겹침 방지) */
+.search__field::-webkit-search-decoration,
+.search__field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.userbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.userbar__name {
+  color: var(--ink);
+  font-weight: 500;
+}
+.userbar__link {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.userbar__link:hover {
+  color: var(--accent-strong);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.05s;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: translateY(0.5px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+.btn-ghost {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.btn-danger {
+  background: transparent;
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.btn-sm {
+  padding: 0.38rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* ── Cards / list rows ────────────────────────────────────────── */
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.card-link {
+  display: block;
+}
+.card-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.card-link:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.card-link:hover::before {
+  background: var(--accent);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.row:hover .row__title {
+  color: var(--accent-strong);
+}
+
+/* ── Typography helpers ───────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.page-title {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.title-link {
+  color: var(--ink);
+  font-weight: 600;
+}
+.title-link:hover {
+  color: var(--accent-strong);
+}
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--faint);
+}
+.key {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.05rem 0.35rem;
+}
+.badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface);
+}
+.badge-restricted {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+/* LLM/API 편집 뱃지 — 마지막 수정/이력 옆에 인라인으로 붙는다 */
+.badge-bot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  margin-left: 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.08rem 0.44rem;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* 좋아요 버튼 */
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.like-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.like-btn__icon {
+  font-size: 0.98rem;
+  line-height: 1;
+}
+.like-btn--on {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.like-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* 헤더 사용자 이름 → 마이페이지 링크 */
+.userbar__name {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.userbar__name:hover {
+  color: var(--accent-strong);
+}
+
+/* 댓글 */
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+.comment__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.comment__author {
+  font-weight: 650;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.comment__time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+.comment__del {
+  margin-left: auto;
+}
+.comment__del-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--faint);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.comment__del-btn:hover {
+  color: var(--danger);
+}
+.comment__body {
+  margin-top: 0.3rem;
+  color: var(--ink-2);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-form__input {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.5rem;
+  font-family: var(--font-sans);
+}
+.comment-form__actions {
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 탭 (마이페이지 활동) */
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.5rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab__count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+.tab--active .tab__count {
+  color: var(--accent-strong);
+}
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--faint);
+}
+.crumb {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.crumb:hover {
+  color: var(--accent-strong);
+}
+
+/* ── Forms ────────────────────────────────────────────────────── */
+.field {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+.field > span,
+.field-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+  color: var(--ink);
+}
+.input,
+.select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input::placeholder {
+  color: var(--faint);
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.input-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 0.6rem 0.75rem;
+}
+
+/* ── Notices ───────────────────────────────────────────────────── */
+.notice { border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 0.9rem; margin-bottom: 1rem; }
+.notice-warn { background: color-mix(in oklab, var(--accent-strong) 12%, transparent); border: 1px solid color-mix(in oklab, var(--accent-strong) 35%, transparent); }
+.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-strong); text-decoration: underline; cursor: pointer; }
+
+/* ── Data table (settings) ────────────────────────────────────── */
+.dtable {
+  width: 100%;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+}
+.dtable th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.dtable td {
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-2);
+}
+
+/* ── Editor (Milkdown Crepe, 블록형 WYSIWYG) ───────────────────── */
+.wysiwyg {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  /* overflow는 숨기지 않는다: 슬래시(/) 메뉴·블록 핸들이 위로 열릴 때 잘리면 안 됨 */
+}
+/* Crepe 색상 변수를 우리 디자인 토큰에 매핑한다.
+   토큰이 다크모드에서 자동으로 뒤집히므로 에디터도 함께 따라온다. */
+.wysiwyg .milkdown {
+  --crepe-color-background: var(--surface);
+  --crepe-color-on-background: var(--ink-2);
+  --crepe-color-surface: var(--surface);
+  --crepe-color-surface-low: var(--surface-2);
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--muted);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-outline: var(--border);
+  --crepe-color-inverse: var(--ink);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: var(--accent);
+  --crepe-color-error: var(--danger);
+  --crepe-color-hover: var(--surface-2);
+  --crepe-color-selected: color-mix(in srgb, var(--accent) 16%, transparent);
+  --crepe-color-inline-area: var(--surface-2);
+  --crepe-font-title: var(--font-sans);
+  --crepe-font-default: var(--font-sans);
+  --crepe-font-code: var(--font-mono);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+/* 편집 영역 타이포를 렌더 페이지(.prose-wiki)와 맞춘다 */
+.wysiwyg .milkdown .ProseMirror {
+  font-size: 0.98rem;
+  line-height: 1.72;
+  padding: 1.4rem 1.5rem;
+  min-height: 460px;
+}
+/* 편집 중 제목 색을 렌더 페이지처럼 잉크 톤으로 맞춘다(앰버는 링크/강조 전용) */
+.wysiwyg .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) { color: var(--ink); }
+.wysiwyg .milkdown .ProseMirror h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+.wysiwyg .milkdown .ProseMirror h2 { font-size: 1.2rem; font-weight: 650; }
+.wysiwyg .milkdown .ProseMirror h3 { font-size: 1.05rem; font-weight: 600; }
+.wysiwyg .milkdown .ProseMirror code { font-family: var(--font-mono); }
+/* 빈 제목 블록 등에서 플레이스홀더가 블록 폰트(제목 크기·굵기)를 물려받아 커지는 것 방지 */
+.wysiwyg .milkdown .crepe-placeholder::before {
+  font-size: 0.98rem;
+  font-weight: 400;
+  line-height: 1.72;
+  letter-spacing: normal;
+}
+
+/* ── Prose (rendered markdown) ────────────────────────────────── */
+.prose-wiki {
+  max-width: 44rem;
+  color: var(--ink-2);
+  font-size: 0.98rem;
+  line-height: 1.72;
+}
+.prose-wiki h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); margin: 1.6rem 0 0.7rem; }
+.prose-wiki h2 { font-size: 1.2rem; font-weight: 650; color: var(--ink); margin: 1.5rem 0 0.6rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+.prose-wiki h3 { font-size: 1.05rem; font-weight: 600; color: var(--ink); margin: 1.1rem 0 0.4rem; }
+.prose-wiki p { margin: 0.7rem 0; }
+.prose-wiki ul { list-style: disc; padding-left: 1.4rem; margin: 0.6rem 0; }
+.prose-wiki ol { list-style: decimal; padding-left: 1.4rem; margin: 0.6rem 0; }
+.prose-wiki li { margin: 0.2rem 0; }
+.prose-wiki a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.prose-wiki a.wiki-link { color: var(--link); text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent); }
+.prose-wiki a.wiki-link-missing { color: var(--danger); text-decoration-style: dotted; }
+.prose-wiki pre { background: var(--surface-2); border: 1px solid var(--border); padding: 0.85rem 1rem; border-radius: 8px; overflow-x: auto; margin: 0.9rem 0; font-size: 0.85rem; line-height: 1.55; }
+.prose-wiki code { font-family: var(--font-mono); font-size: 0.86em; }
+.prose-wiki :not(pre) > code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0.05rem 0.3rem; }
+.prose-wiki table { border-collapse: collapse; margin: 0.9rem 0; font-size: 0.9rem; display: block; overflow-x: auto; }
+.prose-wiki th, .prose-wiki td { border: 1px solid var(--border-strong); padding: 0.4rem 0.75rem; text-align: left; }
+.prose-wiki th { background: var(--surface-2); font-weight: 600; color: var(--ink); }
+.prose-wiki blockquote { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); padding: 0.5rem 0.9rem; margin: 0.9rem 0; color: var(--muted); border-radius: 0 6px 6px 0; }
+.prose-wiki img { max-width: 100%; border-radius: 6px; }
+.prose-wiki hr { border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+/* shiki dual-theme: swap to the dark palette under dark mode */
+@media (prefers-color-scheme: dark) {
+  .prose-wiki pre.shiki,
+  .prose-wiki pre.shiki span {
+    color: var(--shiki-dark, var(--ink-2)) !important;
+    background-color: var(--shiki-dark-bg, var(--surface-2)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

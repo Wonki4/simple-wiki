@@ -1,0 +1,88 @@
+{
+  "realm": "simple-wiki",
+  "enabled": true,
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "wiki-admin", "description": "위키 전역 관리자" }
+    ]
+  },
+  "groups": [
+    { "name": "engineering", "path": "/engineering" },
+    { "name": "hr", "path": "/hr" }
+  ],
+  "clients": [
+    {
+      "clientId": "simple-wiki-app",
+      "name": "simple-wiki",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-only-secret",
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "realm_roles",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "wiki-admin",
+      "enabled": true,
+      "email": "wiki-admin@example.com",
+      "emailVerified": true,
+      "firstName": "Wiki",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin1234", "temporary": false }],
+      "realmRoles": ["wiki-admin"]
+    },
+    {
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Kim",
+      "credentials": [{ "type": "password", "value": "alice1234", "temporary": false }],
+      "groups": ["/engineering"]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Lee",
+      "credentials": [{ "type": "password", "value": "bob1234", "temporary": false }],
+      "groups": []
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+import { createHash, randomBytes } from "node:crypto";
+import type { NextRequest } from "next/server";
+import type { Space, SpacePermission } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { getSessionInfo } from "@/lib/access";
+import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
+
+const TOKEN_PREFIX = "swk_";
+
+export function generateToken(): { raw: string; hash: string; prefix: string } {
+  const raw = TOKEN_PREFIX + randomBytes(32).toString("base64url");
+  return { raw, hash: hashToken(raw), prefix: raw.slice(0, 12) };
+}
+
+export function hashToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
+
+// 행위자 + 인증 경로. via="token"이면 봇/LLM 편집으로 간주하고 tokenName을 표시에 쓴다.
+export type ApiActor = SessionInfo & { via: "token" | "session"; tokenName: string | null };
+
+/**
+ * API 요청의 행위자를 판정한다.
+ * 1) Authorization: Bearer swk_... 개인 액세스 토큰 → 해당 사용자(로그인 시점 권한 스냅샷)
+ * 2) 없으면 브라우저 세션 쿠키로 폴백
+ * 인증 실패 시 null.
+ */
+export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null> {
+  const auth = req.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const raw = auth.slice(7).trim();
+    if (raw.startsWith(TOKEN_PREFIX)) {
+      const token = await prisma.apiToken.findUnique({
+        where: { tokenHash: hashToken(raw) },
+        include: { user: true },
+      });
+      if (!token) return null;
+      // 마지막 사용 시각 갱신(실패해도 요청은 진행)
+      prisma.apiToken
+        .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
+        .catch(() => {});
+      return {
+        userId: token.user.id,
+        groups: token.user.groups,
+        isWikiAdmin: token.user.isWikiAdmin,
+        via: "token",
+        tokenName: token.name,
+      };
+    }
+    return null;
+  }
+  const s = await getSessionInfo();
+  return s ? { ...s, via: "session", tokenName: null } : null;
+}
+
+type SpaceWithPermissions = Space & { permissions: SpacePermission[] };
+
+interface SpaceAuthOk {
+  ok: true;
+  actor: ApiActor;
+  space: SpaceWithPermissions;
+  role: SpaceRole;
+}
+interface SpaceAuthErr {
+  ok: false;
+  response: Response;
+}
+
+/**
+ * API 요청에 대해 스페이스 권한을 판정한다. 브라우저의 requireSpaceRole과 같은
+ * 404 은닉 규칙을 따르되, redirect/notFound 대신 JSON 상태코드를 반환한다.
+ * - 미인증 → 401
+ * - 스페이스 없음/무권한(restricted 은닉) → 404
+ * - 역할 부족 → 403
+ */
+export async function requireApiSpaceRole(
+  req: NextRequest,
+  spaceKey: string,
+  required: SpaceRole,
+): Promise<SpaceAuthOk | SpaceAuthErr> {
+  const actor = await resolveApiActor(req);
+  if (!actor) {
+    return { ok: false, response: Response.json({ error: "인증이 필요합니다." }, { status: 401 }) };
+  }
+  const space = await prisma.space.findUnique({
+    where: { key: spaceKey },
+    include: { permissions: true },
+  });
+  if (!space) {
+    return { ok: false, response: Response.json({ error: "스페이스가 없습니다." }, { status: 404 }) };
+  }
+  const role = resolveSpaceRole(actor, space.visibility, space.permissions);
+  if (role === null) {
+    return { ok: false, response: Response.json({ error: "스페이스가 없습니다." }, { status: 404 }) };
+  }
+  if (!hasRole(role, required)) {
+    return { ok: false, response: Response.json({ error: "권한이 부족합니다." }, { status: 403 }) };
+  }
+  return { ok: true, actor, space, role };
+}

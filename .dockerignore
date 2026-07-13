@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.env
+.env.prod
+data
+docs
+e2e
+tests
+test-results
+mcp-server
+deploy
+keycloak
+.github
+playwright.config.ts
+vitest.config.ts
