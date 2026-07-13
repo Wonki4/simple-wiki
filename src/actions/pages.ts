@@ -39,7 +39,7 @@ export async function updatePage(
 
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
   try {
-    const found = await updatePageInSpace({
+    const result = await updatePageInSpace({
       spaceId: space.id,
       slug,
       title,
@@ -47,7 +47,7 @@ export async function updatePage(
       authorId: session.userId,
       expectedVersion,
     });
-    if (!found) throw new Error("페이지가 없습니다.");
+    if (!result.found) throw new Error("페이지가 없습니다.");
   } catch (e) {
     if (e instanceof PageConflictError) {
       return { conflict: true, currentVersion: e.currentVersion };

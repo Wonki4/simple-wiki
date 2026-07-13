@@ -76,9 +76,9 @@ export async function PUT(
   const expectedVersion =
     typeof body.expectedVersion === "number" ? body.expectedVersion : undefined;
 
-  let found: boolean;
+  let result: { found: boolean; version?: number };
   try {
-    found = await updatePageInSpace({
+    result = await updatePageInSpace({
       spaceId: auth.space.id,
       slug,
       title,
@@ -97,17 +97,13 @@ export async function PUT(
     }
     return Response.json({ error: e instanceof Error ? e.message : "수정 실패" }, { status: 400 });
   }
-  if (!found) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
+  if (!result.found) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
 
-  const saved = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: auth.space.id, slug } },
-    select: { version: true },
-  });
   return Response.json({
     space: { key: auth.space.key },
     slug,
     title: title.trim(),
-    version: saved?.version,
+    version: result.version,
     url: `/s/${spaceKey}/${encodeURIComponent(slug)}`,
   });
 }

@@ -61,11 +61,28 @@ async function commitRevision(input: {
     });
   } catch (e) {
     if (isVersionConflict(e)) {
-      const fresh = await prisma.page.findUnique({
-        where: { id: input.page.id },
-        select: { version: true },
-      });
-      throw new PageConflictError(fresh?.version ?? nextV);
+      // Page.version이 PageRevision.version보다 뒤처져 있을 수 있다(과거 이상 상태 등).
+      // 그대로 두면 fresh?.version이 매번 실제보다 낮게 나와 이후 모든 쓰기가 영구히 409가 된다.
+      // 두 값의 max로 진짜 현재 버전을 구하고, Page.version이 뒤처졌으면 맞춰 자가치유한다.
+      const [fresh, maxRev] = await Promise.all([
+        prisma.page.findUnique({
+          where: { id: input.page.id },
+          select: { version: true },
+        }),
+        prisma.pageRevision.aggregate({
+          where: { pageId: input.page.id },
+          _max: { version: true },
+        }),
+      ]);
+      const freshVersion = fresh?.version ?? 0;
+      const maxRevVersion = maxRev._max.version ?? 0;
+      const currentVersion = Math.max(freshVersion, maxRevVersion);
+      if (currentVersion > 0 && freshVersion < currentVersion) {
+        await prisma.page
+          .update({ where: { id: input.page.id }, data: { version: currentVersion } })
+          .catch(() => {});
+      }
+      throw new PageConflictError(currentVersion || nextV);
     }
     throw e;
   }
@@ -129,23 +146,23 @@ export async function createPageInSpace(
 
 /**
  * 기존 페이지 수정. 제목이 바뀌어도 slug는 유지한다(링크 안정성).
- * 저장할 때마다 새 리비전 스냅샷을 남긴다. 페이지가 없으면 false.
+ * 저장할 때마다 새 리비전 스냅샷을 남긴다. 페이지가 없으면 { found: false }.
  * expectedVersion이 주어지면 현재 버전과 다를 때 PageConflictError를 던진다.
  */
 export async function updatePageInSpace(
   input: WritePageInput & { slug: string; expectedVersion?: number },
-): Promise<boolean> {
+): Promise<{ found: boolean; version?: number }> {
   const title = input.title.trim();
   if (!title) throw new Error("제목을 입력하세요.");
 
   const page = await prisma.page.findUnique({
     where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
-  if (!page) return false;
+  if (!page) return { found: false };
 
   assertExpectedVersion(page.version, input.expectedVersion);
 
-  await commitRevision({
+  const version = await commitRevision({
     page: { id: page.id, version: page.version, spaceId: input.spaceId },
     title,
     content: input.content,
@@ -154,7 +171,7 @@ export async function updatePageInSpace(
     viaLabel: input.viaLabel ?? null,
   });
 
-  return true;
+  return { found: true, version };
 }
 
 export type EditActionInput = {
@@ -188,7 +205,7 @@ export async function editPageContent(
     title: page.title,
     content: newContent,
     authorId: input.authorId,
-    source: input.source ?? "api",
+    source: input.source ?? "web",
     viaLabel: input.viaLabel ?? null,
   });
   return { found: true, version };
@@ -227,12 +244,12 @@ export async function revertPage(input: {
   });
   if (!page) return { found: false };
 
+  assertExpectedVersion(page.version, input.expectedVersion);
+
   const rev = await prisma.pageRevision.findUnique({
     where: { pageId_version: { pageId: page.id, version: input.version } },
   });
   if (!rev) return { found: true, missingRevision: true };
-
-  assertExpectedVersion(page.version, input.expectedVersion);
 
   const version = await commitRevision({
     page: { id: page.id, version: page.version, spaceId: input.spaceId },

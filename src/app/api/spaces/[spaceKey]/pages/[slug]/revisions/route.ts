@@ -21,6 +21,7 @@ export async function GET(
   const revisions = await prisma.pageRevision.findMany({
     where: { pageId: page.id },
     orderBy: { version: "desc" },
+    take: 100,
     select: { version: true, title: true, source: true, viaLabel: true, createdAt: true, authorId: true },
   });
   // 이메일은 노출하지 않는다(PII). 표시 이름만.
