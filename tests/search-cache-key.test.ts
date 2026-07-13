@@ -26,4 +26,11 @@ describe("searchCacheKeyParts (권한 격리)", () => {
     expect(parts.join("|")).toContain("s1");
     expect(parts.join("|")).toContain("s2");
   });
+
+  it("콤마 앨리어싱 충돌을 만들지 않는다(권한 격리)", () => {
+    // (spaces=[s1,s2], q="foo") 와 (spaces=[s1], q="s2,foo") 가 같은 키가 되면 안 된다
+    const a = searchCacheKeyParts("foo", ["s1", "s2"]);
+    const b = searchCacheKeyParts("s2,foo", ["s1"]);
+    expect(a.join(",")).not.toEqual(b.join(","));
+  });
 });

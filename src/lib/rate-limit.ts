@@ -51,8 +51,14 @@ export class RateLimiter {
 
 // ── 프로세스 싱글턴 + env 설정 ──
 // 기본: 토큰당 60 req / 10초 → capacity 60, refill 6/s
-const CAPACITY = Number(process.env.RATE_LIMIT_CAPACITY ?? 60);
-const REFILL = Number(process.env.RATE_LIMIT_REFILL_PER_SEC ?? 6);
+// 잘못된 env 값(빈 문자열/문자/음수)이 Number()로 NaN이 되면 모든 토큰 트래픽이
+// 영구 차단되므로, 파싱 실패 시 기본값으로 폴백한다.
+function parsePositive(v: string | undefined, dflt: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : dflt;
+}
+const CAPACITY = parsePositive(process.env.RATE_LIMIT_CAPACITY, 60);
+const REFILL = parsePositive(process.env.RATE_LIMIT_REFILL_PER_SEC, 6);
 const limiter = new RateLimiter({ capacity: CAPACITY, refillPerSec: REFILL });
 
 let sweepTimer: ReturnType<typeof setInterval> | null = null;

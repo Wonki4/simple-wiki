@@ -36,10 +36,12 @@ export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null
         include: { user: true },
       });
       if (!token) return null;
-      // 마지막 사용 시각 갱신(실패해도 요청은 진행)
-      prisma.apiToken
-        .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
-        .catch(() => {});
+      // 마지막 사용 시각 갱신은 60초에 한 번만(핫로우 쓰기 증폭 방지). 실패해도 요청은 진행.
+      if (!token.lastUsedAt || Date.now() - token.lastUsedAt.getTime() > 60_000) {
+        prisma.apiToken
+          .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
+          .catch(() => {});
+      }
       return {
         userId: token.user.id,
         groups: token.user.groups,

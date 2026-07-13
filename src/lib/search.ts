@@ -11,8 +11,10 @@ export interface SearchResult {
 
 // 캐시 키 파트: 권한 격리를 위해 정렬된 readableSpaceIds + query를 포함한다.
 // 같은 스페이스 집합을 읽을 수 있는 사용자끼리만 캐시를 공유한다.
+// spaceIds/query를 콤마로 join하면 ["s1,s2"]+"foo" 와 ["s1"]+"s2,foo" 가
+// 같은 문자열로 앨리어싱될 수 있어(권한 격리 붕괴), 단일 JSON 파트로 합친다.
 export function searchCacheKeyParts(query: string, spaceIds: string[]): string[] {
-  return ["search", [...spaceIds].sort().join(","), query];
+  return ["search", JSON.stringify({ s: [...spaceIds].sort(), q: query })];
 }
 
 // 실제 검색 쿼리. ts_headline(스니펫 생성, CPU)을 서브쿼리로 상위 50행에만 적용한다.

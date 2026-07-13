@@ -7,7 +7,9 @@ metadata:
     {{- include "simple-wiki.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp
 spec:
+  {{- if not .Values.mcp.autoscaling.enabled }}
   replicas: {{ .Values.mcp.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "simple-wiki.selectorLabels" . | nindent 6 }}
