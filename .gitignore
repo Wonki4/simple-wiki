@@ -13,3 +13,8 @@ playwright-report/
 .playwright-mcp/
 /*.png
 _*.mjs
+
+# vendored Prisma 엔진 바이너리(대용량) — git 에 넣지 않고 별도 반입한다.
+# scripts/vendor-prisma-engines.sh 로 받아 prisma/engines/README.md 절차대로 반입.
+/prisma/engines/*
+!/prisma/engines/README.md

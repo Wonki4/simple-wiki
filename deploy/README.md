@@ -85,3 +85,45 @@ helm install wiki deploy/helm/simple-wiki \
   공개 노출 시 `mcp.allowedHosts` 로 DNS 리바인딩 보호 권장.
 
 주요 values는 `deploy/helm/simple-wiki/values.yaml` 참고.
+
+## 3) 에어갭 빌드 (Prisma 엔진)
+
+폐쇄망 안에서 이미지를 빌드할 때, `prisma generate` / `prisma migrate` 는 엔진 바이너리를
+`binaries.prisma.sh`(CDN)에서 받으려다 실패한다(사내 미러 없음 전제). 엔진을 연결된 머신에서
+미리 받아 소스와 함께 반입하면, `Dockerfile` 이 그 엔진을 `PRISMA_QUERY_ENGINE_LIBRARY` /
+`PRISMA_SCHEMA_ENGINE_BINARY` 로 가리켜 오프라인에서 빌드된다.
+
+**전제**: 폐쇄망에 베이스 이미지(`node:22-alpine`, `postgres`, `keycloak`)와 npm 패키지가
+이미 있거나 함께 반입된다(이 절은 그 미러가 잡아주지 못하는 Prisma 엔진만 다룬다). 런타임
+컨테이너가 `node:*-alpine`(musl)이므로 엔진 플랫폼은 `linux-musl-openssl-3.0.x` 이다.
+
+**A. 연결된 머신에서 (Prisma 버전당 1회)**
+
+```bash
+npm install                          # @prisma/engines-version 이 있어야 함
+./scripts/vendor-prisma-engines.sh   # prisma/engines/ 에 엔진 2개 생성
+```
+
+생성물:
+- `prisma/engines/libquery_engine-linux-musl-openssl-3.0.x.so.node`
+- `prisma/engines/schema-engine-linux-musl-openssl-3.0.x`
+
+이 두 파일은 대용량이라 git 에 커밋하지 않는다(`.gitignore` 처리). `prisma/engines/`
+디렉터리를 소스와 함께 반입 매체(USB 등)에 담는다.
+
+**B. 폐쇄망에서**
+
+```bash
+# 소스 + prisma/engines/ 를 함께 배치한 뒤
+docker build -t simple-wiki:offline .
+```
+
+`Dockerfile` 이 `npm ci --ignore-scripts`(엔진 다운로드 시도 차단) 후, vendored 엔진을
+env 로 지정해 `prisma generate` 를 오프라인으로 수행한다. 런타임 `migrate deploy` 도 같은
+vendored `schema-engine` 을 쓴다.
+
+**버전 업 시**: `package.json` 의 `prisma` 버전을 바꾸면 엔진 커밋 해시가 바뀌므로 A 를
+다시 수행해 새 엔진을 반입한다.
+
+**검증(폐쇄망)**: `docker build` 가 성공하고, 컨테이너 기동 시 initContainer 의
+`prisma migrate deploy` 가 통과하면 정상이다.

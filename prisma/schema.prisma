@@ -1,6 +1,9 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // native = 로컬 개발 머신, linux-musl-openssl-3.0.x = 런타임 컨테이너(node:*-alpine).
+  // 에어갭 빌드는 이 엔진을 prisma/engines/ 에서 가져온다(scripts/vendor-prisma-engines.sh 참고).
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
