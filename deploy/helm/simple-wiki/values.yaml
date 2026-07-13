@@ -51,6 +51,12 @@ secrets:
   # 아래 3개는 필수(비우면 helm install이 required로 실패 — 안전한 기본값 없음).
   # 운영은 secrets.create=false + existingSecret 권장.
   authSecret: ""            # openssl rand -base64 32
+  # ── DB 커넥션 사이징 (스케일링) ──
+  # DATABASE_URL 시크릿 값 끝에 ?connection_limit=<N> 을 붙여 replica당 커넥션 상한을 고정한다.
+  #   예: postgresql://user:pass@host:5432/wiki?connection_limit=5
+  # Postgres max_connections 는 (autoscaling.maxReplicas × connection_limit + 여유) 이상으로 사이징한다.
+  #   예: maxReplicas 10 × 5 + mcp/마이그레이션/관리 여유 → max_connections=150~200
+  # replica를 20~30 이상으로 키우거나 서버리스를 도입하면 그때 PgBouncer(transaction pooling)를 검토한다.
   databaseUrl: ""           # 외부 Postgres 접속 URL (예: postgresql://user:pass@host:5432/wiki)
   keycloakSecret: ""        # 외부 Keycloak client 시크릿
   keys:                     # Secret 안의 키 이름(existingSecret도 동일 키를 가져야 함)

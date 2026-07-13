@@ -86,6 +86,22 @@ helm install wiki deploy/helm/simple-wiki \
 
 주요 values는 `deploy/helm/simple-wiki/values.yaml` 참고.
 
+## DB 커넥션 사이징 (스케일링)
+
+수평 확장(HPA) 시 각 app/mcp 파드가 Prisma 커넥션 풀을 연다. Postgres `max_connections` 를
+소진하지 않도록 두 값을 함께 잡는다.
+
+- **replica당 상한**: `DATABASE_URL` 끝에 `?connection_limit=5` (예)를 붙인다. 코드 변경 없이
+  접속 문자열로 제어된다.
+- **Postgres 사이징**: `max_connections ≥ autoscaling.maxReplicas × connection_limit + 여유`.
+  여유는 마이그레이션 initContainer, 관리/모니터링 커넥션 몫이다.
+  예) maxReplicas 10 × connection_limit 5 = 50, 여유 포함 `max_connections=150~200`.
+- 읽기 캐싱으로 대부분의 읽기가 DB에 닿지 않으므로 활성 커넥션은 위 상한보다 훨씬 낮게 유지된다.
+
+**PgBouncer 재검토 임계치**: HPA `maxReplicas` 를 20~30 이상으로 키우거나 서버리스/엣지를
+도입해 커넥션이 빠르게 생성·소멸하면, 그때 PgBouncer(transaction pooling, `pgbouncer=true`)를
+도입한다. 그 전까지는 위 설정으로 충분하다.
+
 ## 3) 에어갭 빌드 (Prisma 엔진)
 
 폐쇄망 안에서 이미지를 빌드할 때, `prisma generate` / `prisma migrate` 는 엔진 바이너리를
