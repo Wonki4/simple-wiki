@@ -58,10 +58,17 @@ spec:
               containerPort: 3000
           env:
             {{- include "simple-wiki.appEnv" . | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
+          {{- if or .Values.persistence.enabled .Values.config.keycloakCA }}
           volumeMounts:
+            {{- if .Values.persistence.enabled }}
             - name: attachments
               mountPath: {{ .Values.config.attachmentsDir }}
+            {{- end }}
+            {{- if .Values.config.keycloakCA }}
+            - name: keycloak-ca
+              mountPath: /etc/ssl/keycloak-ca
+              readOnly: true
+            {{- end }}
           {{- end }}
           readinessProbe:
             httpGet:
@@ -77,11 +84,18 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
-      {{- if .Values.persistence.enabled }}
+      {{- if or .Values.persistence.enabled .Values.config.keycloakCA }}
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: attachments
           persistentVolumeClaim:
             claimName: {{ include "simple-wiki.fullname" . }}-attachments
+        {{- end }}
+        {{- if .Values.config.keycloakCA }}
+        - name: keycloak-ca
+          configMap:
+            name: {{ include "simple-wiki.fullname" . }}-keycloak-ca
+        {{- end }}
       {{- end }}
       {{- with .Values.app.nodeSelector }}
       nodeSelector:

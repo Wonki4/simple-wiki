@@ -74,6 +74,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.config.keycloakId | quote }}
 - name: AUTH_KEYCLOAK_ISSUER
   value: {{ .Values.config.keycloakIssuer | quote }}
+{{- if .Values.config.keycloakCA }}
+- name: NODE_EXTRA_CA_CERTS
+  value: /etc/ssl/keycloak-ca/ca.pem
+{{- end }}
 - name: ATTACHMENTS_DIR
   value: {{ .Values.config.attachmentsDir | quote }}
 - name: AUTH_SECRET

@@ -46,6 +46,7 @@ named volume(`attachments`, `pgdata`)에 저장됩니다.
 **사전 준비**
 - 외부 PostgreSQL 16 (DATABASE_URL)
 - 외부 Keycloak: realm `simple-wiki`, client `simple-wiki-app`(confidential), redirectUris에 앱 공개 URL 등록
+  - Keycloak이 내부/사설 CA 인증서를 쓰면 CA 체인(PEM)을 `config.keycloakCA` 값으로 전달 (앱 파드에 마운트되어 `NODE_EXTRA_CA_CERTS`로 등록됨)
 - 이미지 레지스트리에 `simple-wiki`, `simple-wiki-mcp` 푸시
 
 **이미지 빌드·푸시**
