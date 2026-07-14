@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionInfo, listReadableSpaces } from "@/lib/access";
 
@@ -15,10 +16,20 @@ export default async function Home() {
 
   const spaces = await listReadableSpaces(session);
   if (spaces.length === 0) {
+    // 전역 관리자에게는 막다른 화면 대신 첫 스페이스 생성 진입점을 준다.
     return (
       <main className="wrap py-20 text-center">
         <h1 className="page-title">스페이스가 없습니다</h1>
-        <p className="muted mt-3">접근 가능한 스페이스가 없습니다. 관리자에게 문의하세요.</p>
+        {session.isWikiAdmin ? (
+          <>
+            <p className="muted mt-3">첫 스페이스를 만들어 시작하세요.</p>
+            <Link href="/spaces/new" className="btn btn-primary mt-6 inline-flex">
+              새 스페이스 만들기
+            </Link>
+          </>
+        ) : (
+          <p className="muted mt-3">접근 가능한 스페이스가 없습니다. 관리자에게 문의하세요.</p>
+        )}
       </main>
     );
   }
