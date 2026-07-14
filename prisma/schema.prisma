@@ -25,6 +25,7 @@ model User {
   apiTokens ApiToken[]
   likes     Like[]
   comments  Comment[]
+  groupMemberships WikiGroupMember[]
 }
 
 // 페이지 좋아요. 사용자당 페이지 1회.
@@ -52,6 +53,26 @@ model Comment {
   createdAt DateTime @default(now())
 
   @@index([pageId])
+}
+
+// 위키 자체 그룹. 스페이스 권한(group 대상)의 subjectRef가 이 id를 가리킨다.
+// 그룹 생성/삭제/멤버 편집은 전역 관리자 전용(/groups).
+model WikiGroup {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  createdAt DateTime          @default(now())
+  members   WikiGroupMember[]
+}
+
+model WikiGroupMember {
+  id      String    @id @default(cuid())
+  groupId String
+  group   WikiGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
 }
 
 // 개인 액세스 토큰 (MCP 등 프로그램 접근용). 원문은 저장하지 않고 SHA-256 해시만 보관한다.
@@ -101,7 +122,7 @@ model SpacePermission {
   spaceId     String
   space       Space       @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   subjectType SubjectType
-  // subjectType=user면 User.id(=Keycloak sub), group이면 Keycloak 그룹 경로(예: "/engineering")
+  // subjectType=user면 User.id(=Keycloak sub), group이면 WikiGroup.id
   subjectRef  String
   role        SpaceRole
 
