@@ -50,6 +50,9 @@ config:
   #   ...
   #   -----END CERTIFICATE-----
   keycloakCA: ""
+  # 지정 시 이 그룹(전체 경로) 소속 사용자도 전역 관리자 (realm 역할 wiki-admin과 병행).
+  # 역할 클레임을 못 내려주는 IdP 연계 환경에서 사용. 예: "/wiki-admins"
+  adminGroup: ""
   attachmentsDir: "/data/attachments"
 
 # 비밀값. 운영은 existingSecret 권장(외부 시크릿 관리와 연동).
