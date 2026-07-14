@@ -66,6 +66,7 @@ services:
       AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID:-simple-wiki-app}
       AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET:-dev-only-secret}
       AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER:-http://keycloak:8080/realms/simple-wiki}
+      WIKI_ADMIN_GROUP: ${WIKI_ADMIN_GROUP:-}
       ATTACHMENTS_DIR: /data/attachments
     volumes:
       - attachments:/data/attachments

@@ -78,6 +78,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: NODE_EXTRA_CA_CERTS
   value: /etc/ssl/keycloak-ca/ca.pem
 {{- end }}
+{{- if .Values.config.adminGroup }}
+- name: WIKI_ADMIN_GROUP
+  value: {{ .Values.config.adminGroup | quote }}
+{{- end }}
 - name: ATTACHMENTS_DIR
   value: {{ .Values.config.attachmentsDir | quote }}
 - name: AUTH_SECRET
