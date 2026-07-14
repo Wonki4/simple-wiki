@@ -17,9 +17,7 @@ model User {
   id        String   @id
   email     String   @default("")
   name      String   @default("")
-  // 로그인 시점의 Keycloak 클레임 스냅샷. API 토큰 요청은 브라우저 세션이 없으므로
-  // 이 스냅샷으로 권한을 판정한다(브라우저 로그인처럼 로그인 시점 기준).
-  groups      String[] @default([])
+  // 로그인 시점의 관리자 판정 스냅샷. API 토큰 요청이 이 값으로 전역 관리자를 판정한다.
   isWikiAdmin Boolean  @default(false)
   createdAt DateTime @default(now())
   apiTokens ApiToken[]
