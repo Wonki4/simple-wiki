@@ -1,6 +1,6 @@
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
-import { addSpacePermission, deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
+import { addGroupPermission, addUserPermission, deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 export default async function SpaceSettingsPage({ params }: { params: Promise<{ spaceKey: string }> }) {
@@ -10,6 +10,13 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
   const userIds = space.permissions.filter((p) => p.subjectType === "user").map((p) => p.subjectRef);
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } });
   const userLabel = new Map(users.map((u) => [u.id, `${u.name} <${u.email}>`]));
+  const allGroups = await prisma.wikiGroup.findMany({ orderBy: { name: "asc" } });
+  const groupLabel = new Map(allGroups.map((g) => [g.id, g.name]));
+
+  const subjectLabel = (p: { subjectType: string; subjectRef: string }) =>
+    p.subjectType === "user"
+      ? (userLabel.get(p.subjectRef) ?? p.subjectRef)
+      : (groupLabel.get(p.subjectRef) ?? p.subjectRef);
 
   return (
     <main className="py-10">
@@ -44,15 +51,13 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
                 <tr key={p.id}>
                   <td>{p.subjectType === "user" ? "사용자" : "그룹"}</td>
                   <td>
-                    <span className="key">
-                      {p.subjectType === "user" ? (userLabel.get(p.subjectRef) ?? p.subjectRef) : p.subjectRef}
-                    </span>
+                    <span className="key">{subjectLabel(p)}</span>
                   </td>
                   <td>{p.role}</td>
                   <td className="text-right">
                     <form action={removeSpacePermission.bind(null, spaceKey, p.id)}>
                       <ConfirmSubmitButton
-                        message={`"${p.subjectType === "user" ? (userLabel.get(p.subjectRef) ?? p.subjectRef) : p.subjectRef}"의 ${p.role} 권한을 삭제할까요?`}
+                        message={`"${subjectLabel(p)}"의 ${p.role} 권한을 삭제할까요?`}
                         className="btn btn-danger btn-sm"
                       >
                         삭제
@@ -70,17 +75,14 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
           </table>
         </div>
 
-        <form action={addSpacePermission.bind(null, spaceKey)} className="mt-5 flex flex-wrap items-end gap-3">
-          <label className="field">
-            <span>유형</span>
-            <select name="subjectType" className="select w-auto">
-              <option value="group">그룹</option>
-              <option value="user">사용자(이메일)</option>
+        <form action={addGroupPermission.bind(null, spaceKey)} className="mt-5 flex flex-wrap items-end gap-3">
+          <label className="field min-w-[16rem]">
+            <span>그룹</span>
+            <select name="groupId" required className="select" disabled={allGroups.length === 0}>
+              {allGroups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
             </select>
-          </label>
-          <label className="field min-w-[16rem] flex-1">
-            <span>대상 (그룹 경로 또는 이메일)</span>
-            <input name="subjectValue" required placeholder="/engineering 또는 alice@example.com" className="input" />
           </label>
           <label className="field">
             <span>역할</span>
@@ -90,7 +92,26 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
               <option value="admin">admin</option>
             </select>
           </label>
-          <button className="btn btn-primary">추가</button>
+          <button className="btn btn-primary" disabled={allGroups.length === 0}>그룹 권한 추가</button>
+          {allGroups.length === 0 && (
+            <span className="muted text-sm">그룹이 없습니다. 전역 관리자가 그룹 관리에서 먼저 만들어야 합니다.</span>
+          )}
+        </form>
+
+        <form action={addUserPermission.bind(null, spaceKey)} className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="field min-w-[16rem] flex-1">
+            <span>사용자 (이메일)</span>
+            <input name="email" type="email" required placeholder="alice@example.com" className="input" />
+          </label>
+          <label className="field">
+            <span>역할</span>
+            <select name="role" className="select w-auto">
+              <option value="viewer">viewer</option>
+              <option value="editor">editor</option>
+              <option value="admin">admin</option>
+            </select>
+          </label>
+          <button className="btn btn-primary">사용자 권한 추가</button>
         </form>
       </section>
 
