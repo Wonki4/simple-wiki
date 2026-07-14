@@ -53,7 +53,7 @@ Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
 
 ## 권한 모델
 
-- **전역 관리자**: Keycloak realm 역할 `wiki-admin` — 스페이스 생성/삭제, 모든 스페이스 관리.
+- **전역 관리자**: Keycloak realm 역할 `wiki-admin` 또는 `WIKI_ADMIN_GROUP`으로 지정한 그룹 소속 — 스페이스 생성/삭제, 모든 스페이스 관리.
 - **스페이스 역할**: `viewer` < `editor` < `admin` — Keycloak 그룹 또는 개별 사용자에게 부여.
 - **공개 범위**: `organization`(로그인 사용자 모두 읽기) / `restricted`(권한 부여 대상만; 미부여자에겐 존재 자체를 404로 숨김).
 - 권한은 **로그인 시점의 Keycloak 클레임을 스냅샷**해 판정합니다. 그룹/역할 변경은 재로그인 시 반영됩니다.
@@ -97,6 +97,7 @@ npm run e2e     # Playwright (docker compose + seed 필요)
 | `AUTH_URL` | 앱 공개 URL |
 | `AUTH_KEYCLOAK_ID` / `AUTH_KEYCLOAK_SECRET` | Keycloak client(`simple-wiki-app`)와 시크릿 |
 | `AUTH_KEYCLOAK_ISSUER` | `{keycloak}/realms/simple-wiki` |
+| `WIKI_ADMIN_GROUP` | (선택) 이 그룹(전체 경로, 예 `/wiki-admins`) 소속도 전역 관리자로 판정 |
 | `ATTACHMENTS_DIR` | 첨부파일 저장 경로 (기본 `./data/attachments`) |
 
 ## 프로젝트 구조

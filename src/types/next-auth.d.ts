@@ -13,5 +13,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     groups?: string[];
     realmRoles?: string[];
+    isWikiAdmin?: boolean;
   }
 }

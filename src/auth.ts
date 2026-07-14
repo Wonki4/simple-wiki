@@ -33,15 +33,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ...(p.resource_access?.[clientId]?.roles ?? []),
           ])
         );
-        // 권한 문제 진단용: 로그인 시점에 ID 토큰에서 실제로 읽은 클레임을 남긴다.
-        console.log(
-          `[auth] signIn sub=${p.sub} user=${p.preferred_username ?? p.email ?? ""} realm_roles=${JSON.stringify(p.realm_roles ?? null)} realm_access.roles=${JSON.stringify(p.realm_access?.roles ?? null)} resource_access[${clientId}].roles=${JSON.stringify(p.resource_access?.[clientId]?.roles ?? null)} groups=${JSON.stringify(p.groups ?? null)}`
-        );
         token.sub = p.sub;
         token.groups = p.groups ?? [];
         token.realmRoles = roles;
         const groups = p.groups ?? [];
-        const isWikiAdmin = roles.includes("wiki-admin");
+        // 전역 관리자: realm 역할 wiki-admin 또는 WIKI_ADMIN_GROUP으로 지정한 그룹(전체 경로) 소속.
+        // 역할 클레임을 못 내려주는 IdP 연계 환경에서는 그룹 쪽 경로만으로 관리자를 운영할 수 있다.
+        const adminGroup = process.env.WIKI_ADMIN_GROUP;
+        const isWikiAdmin =
+          roles.includes("wiki-admin") || (!!adminGroup && groups.includes(adminGroup));
+        token.isWikiAdmin = isWikiAdmin;
+        // 권한 문제 진단용: 로그인 시점에 ID 토큰에서 실제로 읽은 클레임과 판정 결과를 남긴다.
+        console.log(
+          `[auth] signIn sub=${p.sub} user=${p.preferred_username ?? p.email ?? ""} realm_roles=${JSON.stringify(p.realm_roles ?? null)} realm_access.roles=${JSON.stringify(p.realm_access?.roles ?? null)} resource_access[${clientId}].roles=${JSON.stringify(p.resource_access?.[clientId]?.roles ?? null)} groups=${JSON.stringify(p.groups ?? null)} -> isWikiAdmin=${isWikiAdmin}`
+        );
         const name = p.name ?? p.preferred_username ?? "";
         // 권한 스냅샷을 User에 저장 — API 토큰 요청이 이 값으로 권한을 판정한다.
         await prisma.user.upsert({
@@ -55,7 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       session.user.id = token.sub!;
       session.groups = (token.groups as string[]) ?? [];
-      session.isWikiAdmin = ((token.realmRoles as string[]) ?? []).includes("wiki-admin");
+      session.isWikiAdmin = (token.isWikiAdmin as boolean | undefined) ?? false;
       return session;
     },
   },
