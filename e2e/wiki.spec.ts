@@ -3,6 +3,28 @@ import { login } from "./helpers";
 
 // 각 테스트는 독립 브라우저 컨텍스트(별도 세션)에서 실행된다.
 
+test("그룹: 관리자가 alice를 추가하면 재로그인 없이 즉시 반영", async ({ page, browser }) => {
+  // alice 첫 로그인 → User 행 생성. 아직 그룹 미소속이라 엔지니어링이 안 보인다.
+  await login(page, "alice", "alice1234");
+  await expect(page.getByRole("link", { name: "공지사항" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "엔지니어링" })).not.toBeVisible();
+
+  // 별도 브라우저에서 전역 관리자가 engineering 그룹에 alice를 추가한다.
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await login(adminPage, "wiki-admin", "admin1234");
+  await adminPage.goto("/groups");
+  const engSection = adminPage.locator("section", { hasText: "engineering" });
+  await engSection.locator('input[name="email"]').fill("alice@example.com");
+  await engSection.getByRole("button", { name: "멤버 추가" }).click();
+  await expect(engSection.getByText("alice@example.com")).toBeVisible();
+  await adminContext.close();
+
+  // alice는 재로그인 없이 새로고침만으로 즉시 접근된다.
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "엔지니어링" })).toBeVisible();
+});
+
 test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색", async ({ page }) => {
   await login(page, "alice", "alice1234");
 
@@ -54,12 +76,18 @@ test("wiki-admin: 스페이스 생성과 권한 부여", async ({ page }) => {
   await page.getByRole("button", { name: "만들기" }).click();
   await expect(page.getByRole("heading", { name: "E2E 문서" })).toBeVisible();
 
-  await page.getByRole("link", { name: "설정" }).click();
-  await page.locator('select[name="subjectType"]').selectOption("group");
-  await page.locator('input[name="subjectValue"]').fill("/hr");
-  await page.locator('select[name="role"]').selectOption("viewer");
-  await page.getByRole("button", { name: "추가" }).click();
-  await expect(page.getByRole("cell", { name: "/hr" })).toBeVisible();
+  // 그룹 대상은 이제 드롭다운 — 먼저 /groups에서 hr 그룹을 만든다.
+  await page.goto("/groups");
+  await page.locator('input[name="name"]').fill("hr");
+  await page.getByRole("button", { name: "그룹 만들기" }).click();
+  await expect(page.locator("section", { hasText: "hr" }).first()).toBeVisible();
+
+  await page.goto("/s/e2e-docs/settings");
+  const groupForm = page.locator('form:has(select[name="groupId"])');
+  await groupForm.locator('select[name="groupId"]').selectOption({ label: "hr" });
+  await groupForm.locator('select[name="role"]').selectOption("viewer");
+  await groupForm.getByRole("button", { name: "그룹 권한 추가" }).click();
+  await expect(page.getByRole("cell", { name: "hr" })).toBeVisible();
 });
 
 test("첨부파일: 권한/SVG 차단", async ({ page, browser }) => {
