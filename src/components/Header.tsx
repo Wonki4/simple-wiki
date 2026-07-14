@@ -25,6 +25,11 @@ export async function Header() {
             <Link href="/me" className="userbar__name" title="마이페이지">
               {session.user.name}
             </Link>
+            {session.isWikiAdmin && (
+              <Link href="/groups" className="userbar__link">
+                그룹
+              </Link>
+            )}
             <Link href="/settings/tokens" className="userbar__link">
               토큰
             </Link>
