@@ -42,6 +42,14 @@ config:
   keycloakId: "simple-wiki-app"
   # 외부 Keycloak realm issuer (브라우저·서버 모두 접근 가능한 URL)
   keycloakIssuer: "https://auth.example.com/realms/simple-wiki"
+  # Keycloak이 내부/사설 CA 인증서를 쓰면 그 CA 체인(PEM)을 여기에 넣는다.
+  # 차트가 ConfigMap으로 만들어 앱 파드에 마운트하고 NODE_EXTRA_CA_CERTS로 등록한다
+  # (Node는 OS 신뢰 저장소를 읽지 않으므로 노드에 CA를 깔아도 소용없다).
+  # keycloakCA: |
+  #   -----BEGIN CERTIFICATE-----
+  #   ...
+  #   -----END CERTIFICATE-----
+  keycloakCA: ""
   attachmentsDir: "/data/attachments"
 
 # 비밀값. 운영은 existingSecret 권장(외부 시크릿 관리와 연동).
@@ -51,6 +59,12 @@ secrets:
   # 아래 3개는 필수(비우면 helm install이 required로 실패 — 안전한 기본값 없음).
   # 운영은 secrets.create=false + existingSecret 권장.
   authSecret: ""            # openssl rand -base64 32
+  # ── DB 커넥션 사이징 (스케일링) ──
+  # DATABASE_URL 시크릿 값 끝에 ?connection_limit=<N> 을 붙여 replica당 커넥션 상한을 고정한다.
+  #   예: postgresql://user:pass@host:5432/wiki?connection_limit=5
+  # Postgres max_connections 는 (autoscaling.maxReplicas × connection_limit + 여유) 이상으로 사이징한다.
+  #   예: maxReplicas 10 × 5 + mcp/마이그레이션/관리 여유 → max_connections=150~200
+  # replica를 20~30 이상으로 키우거나 서버리스를 도입하면 그때 PgBouncer(transaction pooling)를 검토한다.
   databaseUrl: ""           # 외부 Postgres 접속 URL (예: postgresql://user:pass@host:5432/wiki)
   keycloakSecret: ""        # 외부 Keycloak client 시크릿
   keys:                     # Secret 안의 키 이름(existingSecret도 동일 키를 가져야 함)
@@ -97,6 +111,12 @@ mcp:
     tag: "latest"
     pullPolicy: IfNotPresent
   replicaCount: 1
+  # mcp-server는 무상태(stateless streamable-http)라 수평 확장 가능.
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
   wikiBaseUrl: ""           # 비우면 클러스터 내부 앱 서비스로 자동 연결
   allowedHosts: ""          # DNS 리바인딩 보호(쉼표구분 Host). 공개 노출 시 권장.
   resources:

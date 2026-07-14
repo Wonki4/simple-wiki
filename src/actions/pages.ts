@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireSpaceRole } from "@/lib/access";
 import { createPageInSpace, updatePageInSpace, revertPage } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
+import { invalidatePageCache } from "@/lib/page-render-cache";
 
 export async function createPage(spaceKey: string, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
@@ -62,7 +63,12 @@ export async function updatePage(
 
 export async function deletePage(spaceKey: string, slug: string) {
   const { space } = await requireSpaceRole(spaceKey, "editor");
+  const page = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: space.id, slug } },
+    select: { id: true },
+  });
   await prisma.page.deleteMany({ where: { spaceId: space.id, slug } });
+  if (page) invalidatePageCache(page.id);
   revalidatePath(`/s/${spaceKey}`);
   redirect(`/s/${spaceKey}`);
 }

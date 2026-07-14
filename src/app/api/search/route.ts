@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { resolveApiActor } from "@/lib/api-auth";
+import { resolveApiActor, rateLimitResponse } from "@/lib/api-auth";
 import { listReadableSpaces } from "@/lib/access";
 import { searchPages } from "@/lib/search";
 
@@ -7,6 +7,8 @@ import { searchPages } from "@/lib/search";
 export async function GET(req: NextRequest) {
   const actor = await resolveApiActor(req);
   if (!actor) return Response.json({ error: "인증이 필요합니다." }, { status: 401 });
+  const limited = rateLimitResponse(actor);
+  if (limited) return limited;
 
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q) return Response.json({ query: "", results: [] });

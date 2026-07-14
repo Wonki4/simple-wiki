@@ -2,8 +2,7 @@ import Link from "next/link";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
-import { renderMarkdown } from "@/lib/markdown";
-import { extractWikiLinks } from "@/lib/wiki-links";
+import { getRenderedPageHtml } from "@/lib/page-render-cache";
 import { deletePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EditSourceBadge } from "@/components/EditSourceBadge";
@@ -45,16 +44,12 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
   const likeState = await getLikeState(page.id, session.userId);
   const comments = await listComments(page.id);
   const canModerate = hasRole(role, "admin");
-  const targets = extractWikiLinks(page.content).map((l) => l.slug);
-  const existing = targets.length
-    ? await prisma.page.findMany({
-        where: { spaceId: space.id, slug: { in: targets } },
-        select: { slug: true },
-      })
-    : [];
-  const html = await renderMarkdown(page.content, {
+  const html = await getRenderedPageHtml({
+    pageId: page.id,
+    version: page.version,
+    content: page.content,
+    spaceId: space.id,
     spaceKey,
-    existingSlugs: new Set(existing.map((p) => p.slug)),
   });
 
   const backlinks = await prisma.pageLink.findMany({

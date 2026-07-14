@@ -4,6 +4,7 @@ import type { Space, SpacePermission } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSessionInfo } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
+import { checkTokenRateLimit } from "@/lib/rate-limit";
 
 const TOKEN_PREFIX = "swk_";
 
@@ -17,7 +18,7 @@ export function hashToken(raw: string): string {
 }
 
 // 행위자 + 인증 경로. via="token"이면 봇/LLM 편집으로 간주하고 tokenName을 표시에 쓴다.
-export type ApiActor = SessionInfo & { via: "token" | "session"; tokenName: string | null };
+export type ApiActor = SessionInfo & { via: "token" | "session"; tokenName: string | null; tokenId: string | null };
 
 /**
  * API 요청의 행위자를 판정한다.
@@ -35,22 +36,39 @@ export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null
         include: { user: true },
       });
       if (!token) return null;
-      // 마지막 사용 시각 갱신(실패해도 요청은 진행)
-      prisma.apiToken
-        .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
-        .catch(() => {});
+      // 마지막 사용 시각 갱신은 60초에 한 번만(핫로우 쓰기 증폭 방지). 실패해도 요청은 진행.
+      if (!token.lastUsedAt || Date.now() - token.lastUsedAt.getTime() > 60_000) {
+        prisma.apiToken
+          .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
+          .catch(() => {});
+      }
       return {
         userId: token.user.id,
         groups: token.user.groups,
         isWikiAdmin: token.user.isWikiAdmin,
         via: "token",
         tokenName: token.name,
+        tokenId: token.id,
       };
     }
     return null;
   }
   const s = await getSessionInfo();
-  return s ? { ...s, via: "session", tokenName: null } : null;
+  return s ? { ...s, via: "session", tokenName: null, tokenId: null } : null;
+}
+
+/**
+ * 토큰 행위자가 rate limit을 초과하면 429 Response를 반환한다. 아니면 null.
+ * 세션(사람) 행위자는 검사하지 않는다.
+ */
+export function rateLimitResponse(actor: ApiActor): Response | null {
+  if (actor.via !== "token" || !actor.tokenId) return null;
+  const r = checkTokenRateLimit(actor.tokenId);
+  if (r.allowed) return null;
+  return Response.json(
+    { error: "요청이 너무 많습니다. 잠시 후 다시 시도하세요." },
+    { status: 429, headers: { "Retry-After": String(r.retryAfterSec) } },
+  );
 }
 
 type SpaceWithPermissions = Space & { permissions: SpacePermission[] };
@@ -82,6 +100,8 @@ export async function requireApiSpaceRole(
   if (!actor) {
     return { ok: false, response: Response.json({ error: "인증이 필요합니다." }, { status: 401 }) };
   }
+  const limited = rateLimitResponse(actor);
+  if (limited) return { ok: false, response: limited };
   const space = await prisma.space.findUnique({
     where: { key: spaceKey },
     include: { permissions: true },
