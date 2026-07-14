@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
 import type { Space, SpacePermission } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { getSessionInfo } from "@/lib/access";
+import { getSessionInfo, getWikiGroupIds } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
 import { checkTokenRateLimit } from "@/lib/rate-limit";
 
@@ -44,7 +44,7 @@ export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null
       }
       return {
         userId: token.user.id,
-        groups: token.user.groups,
+        groups: await getWikiGroupIds(token.user.id),
         isWikiAdmin: token.user.isWikiAdmin,
         via: "token",
         tokenName: token.name,
