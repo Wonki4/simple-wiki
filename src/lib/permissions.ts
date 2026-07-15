@@ -3,12 +3,14 @@ export type SpaceVisibility = "organization" | "restricted";
 
 export interface SessionInfo {
   userId: string;
+  /** 내가 속한 WikiGroup id 목록 (요청 시 DB 조회 — 클레임 스냅샷 아님) */
   groups: string[];
   isWikiAdmin: boolean;
 }
 
 export interface PermissionEntry {
   subjectType: "user" | "group";
+  /** user면 User.id(=Keycloak sub), group이면 WikiGroup.id */
   subjectRef: string;
   role: SpaceRole;
 }

@@ -5,8 +5,9 @@ import { prisma } from "@/lib/db";
 // User.id = Keycloak sub. 첫 로그인(및 매 로그인) 시 프로필을 upsert한다.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Keycloak],
-  // 권한 클레임(groups/realm_roles)은 로그인 시점에만 갱신되므로 세션을 짧게 유지해
-  // Keycloak에서 회수된 권한이 최대 8시간 내에 만료되도록 한다.
+  // 관리자 판정(realm_roles/WIKI_ADMIN_GROUP)은 로그인 시점에만 갱신되므로 세션을 짧게 유지해
+  // Keycloak에서 회수된 관리자 권한이 최대 8시간 내에 만료되도록 한다.
+  // 스페이스 권한은 WikiGroup(DB) 기준이라 세션 수명과 무관하게 즉시 반영된다.
   session: { maxAge: 8 * 60 * 60 },
   callbacks: {
     async jwt({ token, profile, trigger }) {
@@ -34,7 +35,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ])
         );
         token.sub = p.sub;
-        token.groups = p.groups ?? [];
         token.realmRoles = roles;
         const groups = p.groups ?? [];
         // 전역 관리자: realm 역할 wiki-admin 또는 WIKI_ADMIN_GROUP으로 지정한 그룹(전체 경로) 소속.
@@ -48,18 +48,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           `[auth] signIn sub=${p.sub} user=${p.preferred_username ?? p.email ?? ""} realm_roles=${JSON.stringify(p.realm_roles ?? null)} realm_access.roles=${JSON.stringify(p.realm_access?.roles ?? null)} resource_access[${clientId}].roles=${JSON.stringify(p.resource_access?.[clientId]?.roles ?? null)} groups=${JSON.stringify(p.groups ?? null)} -> isWikiAdmin=${isWikiAdmin}`
         );
         const name = p.name ?? p.preferred_username ?? "";
-        // 권한 스냅샷을 User에 저장 — API 토큰 요청이 이 값으로 권한을 판정한다.
+        // 프로필과 관리자 판정 스냅샷을 User에 저장 — 스페이스 권한은 WikiGroup(DB)에서 판정한다.
         await prisma.user.upsert({
           where: { id: p.sub },
-          update: { email: p.email ?? "", name, groups, isWikiAdmin },
-          create: { id: p.sub, email: p.email ?? "", name, groups, isWikiAdmin },
+          update: { email: p.email ?? "", name, isWikiAdmin },
+          create: { id: p.sub, email: p.email ?? "", name, isWikiAdmin },
         });
       }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.sub!;
-      session.groups = (token.groups as string[]) ?? [];
       session.isWikiAdmin = (token.isWikiAdmin as boolean | undefined) ?? false;
       return session;
     },

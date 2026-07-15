@@ -34,27 +34,38 @@ export async function updateSpaceVisibility(spaceKey: string, formData: FormData
   revalidatePath("/");
 }
 
-export async function addSpacePermission(spaceKey: string, formData: FormData) {
-  const { space } = await requireSpaceRole(spaceKey, "admin");
-  const subjectType = formData.get("subjectType") === "group" ? "group" : "user";
-  const subjectValue = String(formData.get("subjectValue") ?? "").trim();
-  const roleInput = String(formData.get("role") ?? "viewer");
-  const role = roleInput === "admin" ? "admin" : roleInput === "editor" ? "editor" : "viewer";
-  if (!subjectValue) throw new Error("대상을 입력하세요.");
+function parseRole(v: FormDataEntryValue | null) {
+  const s = String(v ?? "viewer");
+  return s === "admin" ? "admin" : s === "editor" ? "editor" : "viewer";
+}
 
-  let subjectRef = subjectValue;
-  if (subjectType === "user") {
-    const user = await prisma.user.findFirst({ where: { email: subjectValue } });
-    if (!user) throw new Error("해당 이메일의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 합니다.");
-    subjectRef = user.id;
-  } else if (!subjectValue.startsWith("/")) {
-    throw new Error('그룹 경로는 "/"로 시작해야 합니다. 예: /engineering');
-  }
+export async function addGroupPermission(spaceKey: string, formData: FormData) {
+  const { space } = await requireSpaceRole(spaceKey, "admin");
+  const groupId = String(formData.get("groupId") ?? "");
+  const role = parseRole(formData.get("role"));
+  const group = await prisma.wikiGroup.findUnique({ where: { id: groupId } });
+  if (!group) throw new Error("존재하지 않는 그룹입니다.");
 
   await prisma.spacePermission.upsert({
-    where: { spaceId_subjectType_subjectRef: { spaceId: space.id, subjectType, subjectRef } },
+    where: { spaceId_subjectType_subjectRef: { spaceId: space.id, subjectType: "group", subjectRef: group.id } },
     update: { role },
-    create: { spaceId: space.id, subjectType, subjectRef, role },
+    create: { spaceId: space.id, subjectType: "group", subjectRef: group.id, role },
+  });
+  revalidatePath(`/s/${spaceKey}/settings`);
+}
+
+export async function addUserPermission(spaceKey: string, formData: FormData) {
+  const { space } = await requireSpaceRole(spaceKey, "admin");
+  const email = String(formData.get("email") ?? "").trim();
+  const role = parseRole(formData.get("role"));
+  if (!email) throw new Error("이메일을 입력하세요.");
+  const user = await prisma.user.findFirst({ where: { email } });
+  if (!user) throw new Error("해당 이메일의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 합니다.");
+
+  await prisma.spacePermission.upsert({
+    where: { spaceId_subjectType_subjectRef: { spaceId: space.id, subjectType: "user", subjectRef: user.id } },
+    update: { role },
+    create: { spaceId: space.id, subjectType: "user", subjectRef: user.id, role },
   });
   revalidatePath(`/s/${spaceKey}/settings`);
 }

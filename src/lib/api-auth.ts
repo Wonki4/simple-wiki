@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
 import type { Space, SpacePermission } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { getSessionInfo } from "@/lib/access";
+import { getSessionInfo, getWikiGroupIds } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
 import { checkTokenRateLimit } from "@/lib/rate-limit";
 
@@ -22,7 +22,7 @@ export type ApiActor = SessionInfo & { via: "token" | "session"; tokenName: stri
 
 /**
  * API 요청의 행위자를 판정한다.
- * 1) Authorization: Bearer swk_... 개인 액세스 토큰 → 해당 사용자(로그인 시점 권한 스냅샷)
+ * 1) Authorization: Bearer swk_... 개인 액세스 토큰 → 해당 사용자(그룹은 요청 시 DB 조회로 즉시 반영, 관리자 여부는 로그인 시점 스냅샷)
  * 2) 없으면 브라우저 세션 쿠키로 폴백
  * 인증 실패 시 null.
  */
@@ -44,7 +44,7 @@ export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null
       }
       return {
         userId: token.user.id,
-        groups: token.user.groups,
+        groups: await getWikiGroupIds(token.user.id),
         isWikiAdmin: token.user.isWikiAdmin,
         via: "token",
         tokenName: token.name,

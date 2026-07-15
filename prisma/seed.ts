@@ -15,15 +15,25 @@ async function main() {
     create: { key: "eng", name: "엔지니어링", description: "엔지니어링 팀 위키", visibility: "restricted" },
   });
 
-  await prisma.spacePermission.upsert({
-    where: {
-      spaceId_subjectType_subjectRef: { spaceId: eng.id, subjectType: "group", subjectRef: "/engineering" },
-    },
-    update: { role: "editor" },
-    create: { spaceId: eng.id, subjectType: "group", subjectRef: "/engineering", role: "editor" },
+  // 위키 자체 그룹. 멤버는 사용자가 최소 1회 로그인한 뒤 /groups에서 추가한다(User.id = Keycloak sub).
+  const engGroup = await prisma.wikiGroup.upsert({
+    where: { name: "engineering" },
+    update: {},
+    create: { name: "engineering" },
   });
 
-  console.log("seed 완료: notice(organization), eng(restricted, /engineering=editor)");
+  // 구 시드의 Keycloak 경로 기반 권한 잔재 제거(있다면).
+  await prisma.spacePermission.deleteMany({ where: { subjectType: "group", subjectRef: "/engineering" } });
+
+  await prisma.spacePermission.upsert({
+    where: {
+      spaceId_subjectType_subjectRef: { spaceId: eng.id, subjectType: "group", subjectRef: engGroup.id },
+    },
+    update: { role: "editor" },
+    create: { spaceId: eng.id, subjectType: "group", subjectRef: engGroup.id, role: "editor" },
+  });
+
+  console.log("seed 완료: notice(organization), eng(restricted, engineering 그룹=editor — 멤버는 /groups에서 추가)");
 }
 
 main()

@@ -6,12 +6,22 @@ import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/l
 
 export type SpaceWithPermissions = Space & { permissions: SpacePermission[] };
 
+// 요청 시점의 위키 그룹 멤버십 조회. 세션/토큰의 클레임 스냅샷 대신 이 값으로
+// 스페이스 권한을 판정하므로 그룹 변경이 재로그인 없이 즉시 반영된다.
+export async function getWikiGroupIds(userId: string): Promise<string[]> {
+  const rows = await prisma.wikiGroupMember.findMany({
+    where: { userId },
+    select: { groupId: true },
+  });
+  return rows.map((r) => r.groupId);
+}
+
 export async function getSessionInfo(): Promise<SessionInfo | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
   return {
     userId: session.user.id,
-    groups: session.groups ?? [],
+    groups: await getWikiGroupIds(session.user.id),
     isWikiAdmin: session.isWikiAdmin ?? false,
   };
 }
