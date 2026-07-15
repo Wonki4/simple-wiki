@@ -84,6 +84,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 - name: ATTACHMENTS_DIR
   value: {{ .Values.config.attachmentsDir | quote }}
+- name: STORAGE_DRIVER
+  value: {{ .Values.storage.driver | quote }}
+{{- if eq .Values.storage.driver "s3" }}
+- name: S3_ENDPOINT
+  value: {{ required "storage.s3.endpoint is required when storage.driver=s3" .Values.storage.s3.endpoint | quote }}
+- name: S3_BUCKET
+  value: {{ required "storage.s3.bucket is required when storage.driver=s3" .Values.storage.s3.bucket | quote }}
+- name: S3_REGION
+  value: {{ .Values.storage.s3.region | quote }}
+- name: S3_FORCE_PATH_STYLE
+  value: {{ .Values.storage.s3.forcePathStyle | quote }}
+- name: S3_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "simple-wiki.secretName" . }}
+      key: {{ .Values.secrets.keys.s3AccessKeyId }}
+- name: S3_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "simple-wiki.secretName" . }}
+      key: {{ .Values.secrets.keys.s3SecretAccessKey }}
+{{- end }}
 - name: AUTH_SECRET
   valueFrom:
     secretKeyRef:
