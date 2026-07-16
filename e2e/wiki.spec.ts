@@ -88,6 +88,17 @@ test("wiki-admin: 스페이스 생성과 권한 부여", async ({ page }) => {
   await groupForm.locator('select[name="role"]').selectOption("viewer");
   await groupForm.getByRole("button", { name: "그룹 권한 추가" }).click();
   await expect(page.getByRole("cell", { name: "hr" })).toBeVisible();
+
+  // 없는 사용자는 크래시 대신 경고 배너 + 서버 로그
+  const userForm = page.locator('form:has(input[name="email"])');
+  await userForm.locator('input[name="email"]').fill("nobody@example.com");
+  await userForm.getByRole("button", { name: "사용자 권한 추가" }).click();
+  await expect(page.locator(".notice-warn").filter({ hasText: "사용자가 없습니다" })).toBeVisible();
+
+  // Keycloak 아이디로 추가 — alice는 첫 테스트에서 로그인해 username이 채워져 있다
+  await userForm.locator('input[name="email"]').fill("alice");
+  await userForm.getByRole("button", { name: "사용자 권한 추가" }).click();
+  await expect(page.getByRole("cell", { name: /alice@example.com/ })).toBeVisible();
 });
 
 test("첨부파일: 권한/SVG 차단", async ({ page, browser }) => {
