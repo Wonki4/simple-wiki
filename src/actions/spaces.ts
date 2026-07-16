@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSession, requireSpaceRole } from "@/lib/access";
 import { storage } from "@/lib/storage";
+import { findUserByEmailOrUsername } from "@/lib/users";
 
 const SPACE_KEY_RE = /^[a-z0-9][a-z0-9-]{1,31}$/;
 
@@ -45,7 +46,11 @@ export async function addGroupPermission(spaceKey: string, formData: FormData) {
   const groupId = String(formData.get("groupId") ?? "");
   const role = parseRole(formData.get("role"));
   const group = await prisma.wikiGroup.findUnique({ where: { id: groupId } });
-  if (!group) throw new Error("존재하지 않는 그룹입니다.");
+  if (!group) {
+    // 드롭다운 우회/경합 케이스 — 크래시 대신 배너로 안내하고 서버 로그를 남긴다.
+    console.warn(`[perm] 그룹 권한 추가 실패 — 존재하지 않는 그룹 (space=${spaceKey}, groupId=${groupId})`);
+    redirect(`/s/${spaceKey}/settings?error=${encodeURIComponent("존재하지 않는 그룹입니다.")}`);
+  }
 
   await prisma.spacePermission.upsert({
     where: { spaceId_subjectType_subjectRef: { spaceId: space.id, subjectType: "group", subjectRef: group.id } },
@@ -53,15 +58,24 @@ export async function addGroupPermission(spaceKey: string, formData: FormData) {
     create: { spaceId: space.id, subjectType: "group", subjectRef: group.id, role },
   });
   revalidatePath(`/s/${spaceKey}/settings`);
+  // 성공 시에도 쿼리 없는 경로로 — 이전 에러 배너가 URL에 남지 않게.
+  redirect(`/s/${spaceKey}/settings`);
 }
 
 export async function addUserPermission(spaceKey: string, formData: FormData) {
   const { space } = await requireSpaceRole(spaceKey, "admin");
-  const email = String(formData.get("email") ?? "").trim();
+  const value = String(formData.get("email") ?? "").trim();
   const role = parseRole(formData.get("role"));
-  if (!email) throw new Error("이메일을 입력하세요.");
-  const user = await prisma.user.findFirst({ where: { email } });
-  if (!user) throw new Error("해당 이메일의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 합니다.");
+  if (!value) redirect(`/s/${spaceKey}/settings?error=${encodeURIComponent("이메일 또는 아이디를 입력하세요.")}`);
+  const user = await findUserByEmailOrUsername(value);
+  if (!user) {
+    console.warn(`[perm] 사용자 권한 추가 실패 — 사용자 없음 (space=${spaceKey}, 입력=${value})`);
+    redirect(
+      `/s/${spaceKey}/settings?error=${encodeURIComponent(
+        "해당 이메일 또는 아이디의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 하며, 아이디 검색은 다음 로그인부터 가능합니다.",
+      )}`,
+    );
+  }
 
   await prisma.spacePermission.upsert({
     where: { spaceId_subjectType_subjectRef: { spaceId: space.id, subjectType: "user", subjectRef: user.id } },
@@ -69,6 +83,7 @@ export async function addUserPermission(spaceKey: string, formData: FormData) {
     create: { spaceId: space.id, subjectType: "user", subjectRef: user.id, role },
   });
   revalidatePath(`/s/${spaceKey}/settings`);
+  redirect(`/s/${spaceKey}/settings`);
 }
 
 export async function removeSpacePermission(spaceKey: string, permissionId: string) {

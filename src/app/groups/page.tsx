@@ -4,9 +4,10 @@ import { prisma } from "@/lib/db";
 import { addGroupMember, createGroup, deleteGroup, removeGroupMember } from "@/actions/groups";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
-export default async function GroupsPage() {
+export default async function GroupsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
   if (!session.isWikiAdmin) redirect("/denied");
+  const { error } = await searchParams;
 
   const groups = await prisma.wikiGroup.findMany({
     orderBy: { name: "asc" },
@@ -27,6 +28,12 @@ export default async function GroupsPage() {
       <p className="muted mt-2 text-sm">
         스페이스 권한에 연결하는 위키 그룹입니다. 멤버 변경은 재로그인 없이 즉시 반영됩니다.
       </p>
+
+      {error && (
+        <div className="notice notice-warn mt-4" role="alert">
+          {error}
+        </div>
+      )}
 
       <form action={createGroup} className="mt-6 flex items-end gap-3">
         <label className="field min-w-[16rem]">
@@ -92,8 +99,8 @@ export default async function GroupsPage() {
 
           <form action={addGroupMember.bind(null, g.id)} className="mt-4 flex items-end gap-3">
             <label className="field min-w-[16rem]">
-              <span>멤버 추가 (이메일 — 로그인 이력이 있어야 합니다)</span>
-              <input name="email" type="email" required placeholder="alice@example.com" className="input" />
+              <span>멤버 추가 (이메일 또는 아이디 — 로그인 이력이 있어야 합니다)</span>
+              <input name="email" type="text" required placeholder="alice@example.com" className="input" />
             </label>
             <button className="btn btn-primary btn-sm">멤버 추가</button>
           </form>

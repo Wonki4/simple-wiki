@@ -3,8 +3,15 @@ import { prisma } from "@/lib/db";
 import { addGroupPermission, addUserPermission, deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
-export default async function SpaceSettingsPage({ params }: { params: Promise<{ spaceKey: string }> }) {
+export default async function SpaceSettingsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ spaceKey: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { spaceKey } = await params;
+  const { error } = await searchParams;
   const { session, space } = await requireSpaceRole(spaceKey, "admin");
 
   const userIds = space.permissions.filter((p) => p.subjectType === "user").map((p) => p.subjectRef);
@@ -22,6 +29,12 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
     <main className="py-10">
       <p className="eyebrow">{space.key} · settings</p>
       <h1 className="page-title mt-1">{space.name} 설정</h1>
+
+      {error && (
+        <div className="notice notice-warn mt-4" role="alert">
+          {error}
+        </div>
+      )}
 
       <section className="mt-8">
         <h2 className="section-title">공개 범위</h2>
@@ -100,8 +113,8 @@ export default async function SpaceSettingsPage({ params }: { params: Promise<{ 
 
         <form action={addUserPermission.bind(null, spaceKey)} className="mt-3 flex flex-wrap items-end gap-3">
           <label className="field min-w-[16rem] flex-1">
-            <span>사용자 (이메일)</span>
-            <input name="email" type="email" required placeholder="alice@example.com" className="input" />
+            <span>사용자 (이메일 또는 아이디)</span>
+            <input name="email" type="text" required placeholder="alice@example.com 또는 alice" className="input" />
           </label>
           <label className="field">
             <span>역할</span>
