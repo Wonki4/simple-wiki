@@ -51,8 +51,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // 프로필과 관리자 판정 스냅샷을 User에 저장 — 스페이스 권한은 WikiGroup(DB)에서 판정한다.
         await prisma.user.upsert({
           where: { id: p.sub },
-          update: { email: p.email ?? "", name, isWikiAdmin },
-          create: { id: p.sub, email: p.email ?? "", name, isWikiAdmin },
+          update: { email: p.email ?? "", name, username: p.preferred_username ?? null, isWikiAdmin },
+          create: { id: p.sub, email: p.email ?? "", name, username: p.preferred_username ?? null, isWikiAdmin },
         });
       }
       return token;
