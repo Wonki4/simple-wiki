@@ -105,6 +105,14 @@ function createS3Adapter(): StorageAdapter {
   };
 }
 
-// 드라이버 선택은 기동(모듈 로드) 시점 1회 — s3 설정 누락은 여기서 즉시 실패한다.
-export const storage: StorageAdapter =
-  (process.env.STORAGE_DRIVER ?? "local") === "s3" ? createS3Adapter() : localAdapter;
+// 드라이버 선택은 모듈 로드 시점 1회 — s3 설정 누락이나 알 수 없는 드라이버 값은
+// 여기서 즉시 실패한다(오타가 조용히 local 폴백되어 임시 FS에 쓰는 사고 방지).
+function createAdapter(): StorageAdapter {
+  const driver = process.env.STORAGE_DRIVER ?? "local";
+  if (driver === "s3") return createS3Adapter();
+  if (driver !== "local") {
+    throw new Error(`STORAGE_DRIVER는 "local" 또는 "s3"여야 합니다 (현재 값: "${driver}")`);
+  }
+  return localAdapter;
+}
+export const storage: StorageAdapter = createAdapter();
