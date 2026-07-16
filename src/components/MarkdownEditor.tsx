@@ -118,7 +118,10 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         // 링크 텍스트의 대괄호는 마크다운 링크 문법을 깨므로 제거한다.
         const label = filename.replace(/[[\]]/g, "");
         const md = file.type.startsWith("image/") ? `![${label}](${url})` : `[${label}](${url})`;
-        crepeRef.current.editor.action(insert(md));
+        // await 사이에 언마운트되면(저장 후 이동 등) cleanup이 ref를 비운다 — 남은 삽입은 중단.
+        const crepe = crepeRef.current;
+        if (!crepe) break;
+        crepe.editor.action(insert(md));
       }
     } finally {
       setUploading(false);
@@ -193,7 +196,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         </p>
       </div>
       <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => attachFiles(e.target.files)} />
-      <button disabled={saving} className="btn btn-primary mt-4">
+      <button disabled={saving || uploading} className="btn btn-primary mt-4">
         {saving ? "저장 중..." : "저장"}
       </button>
     </form>
