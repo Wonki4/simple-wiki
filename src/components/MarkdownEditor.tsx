@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Crepe as CrepeType } from "@milkdown/crepe";
+import { insert } from "@milkdown/kit/utils";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 
@@ -38,6 +39,8 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
   const [conflict, setConflict] = useState(false);
   const holderRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<CrepeType | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let crepe: CrepeType | null = null;
@@ -97,6 +100,33 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 파일 첨부 버튼: 순차 업로드 후 커서 위치에 링크 삽입(이미지는 인라인 이미지).
+  // 실패하면 성공분 링크는 유지하고 그 파일부터 중단한다.
+  async function attachFiles(files: FileList | null) {
+    if (!files || files.length === 0 || !crepeRef.current) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`/api/spaces/${spaceKey}/attachments`, { method: "POST", body: fd });
+        if (!res.ok) {
+          alert(`파일 업로드에 실패했습니다: ${file.name}`);
+          break;
+        }
+        const { url, filename } = (await res.json()) as { url: string; filename: string };
+        // 링크 텍스트의 대괄호는 마크다운 링크 문법을 깨므로 제거한다.
+        const label = filename.replace(/[[\]]/g, "");
+        const md = file.type.startsWith("image/") ? `![${label}](${url})` : `[${label}](${url})`;
+        crepeRef.current.editor.action(insert(md));
+      }
+    } finally {
+      setUploading(false);
+      // 같은 파일을 연속으로 다시 선택할 수 있도록 초기화.
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   return (
     <form
       action={async (fd) => {
@@ -148,9 +178,21 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
       <div className="wysiwyg mt-4">
         <div ref={holderRef} />
       </div>
-      <p className="meta mt-2.5">
-        이미지를 붙여넣거나 끌어다 올릴 수 있습니다. [[페이지명]]으로 위키링크를 만들 수 있습니다.
-      </p>
+      <div className="mt-2.5 flex items-center gap-3">
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? "올리는 중..." : "파일 첨부"}
+        </button>
+        <p className="meta">
+          이미지는 붙여넣기/드래그로, 일반 파일은 &apos;파일 첨부&apos; 버튼으로 올릴 수 있습니다. [[페이지명]]으로
+          위키링크를 만들 수 있습니다.
+        </p>
+      </div>
+      <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => attachFiles(e.target.files)} />
       <button disabled={saving} className="btn btn-primary mt-4">
         {saving ? "저장 중..." : "저장"}
       </button>
