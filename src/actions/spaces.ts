@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSession, requireSpaceRole } from "@/lib/access";
+import { storage } from "@/lib/storage";
 
 const SPACE_KEY_RE = /^[a-z0-9][a-z0-9-]{1,31}$/;
 
@@ -79,9 +80,22 @@ export async function removeSpacePermission(spaceKey: string, permissionId: stri
 export async function deleteSpace(spaceKey: string) {
   const session = await requireSession();
   if (!session.isWikiAdmin) redirect("/denied");
+  const space = await prisma.space.findUnique({ where: { key: spaceKey } });
+  if (!space) redirect("/");
   // Page/PageRevision/PageLink/SpacePermission/Attachment 레코드는 onDelete: Cascade로 함께 삭제된다.
-  // 첨부파일의 디스크 파일은 남는다(v1 허용) — 스토리지 정리는 추후 과제.
-  await prisma.space.deleteMany({ where: { key: spaceKey } });
+  try {
+    await prisma.space.delete({ where: { id: space.id } });
+  } catch (e) {
+    // 동시 이중 삭제(P2025)면 이미 삭제된 것 — 구 deleteMany처럼 멱등하게 계속 진행
+    if ((e as { code?: string }).code !== "P2025") throw e;
+  }
+  // 스토리지 오브젝트 정리는 베스트에포트 — 실패해도 스페이스 삭제는 유지한다.
+  // 고아 오브젝트는 무해(키 유일·재사용 없음)하지만 반쯤 롤백된 삭제가 더 나쁘다.
+  try {
+    await storage.deletePrefix(space.id);
+  } catch (e) {
+    console.error(`[storage] 스페이스 ${spaceKey}(${space.id}) 첨부 정리 실패:`, e);
+  }
   revalidatePath("/");
   redirect("/");
 }

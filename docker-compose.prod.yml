@@ -68,6 +68,14 @@ services:
       AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER:-http://keycloak:8080/realms/simple-wiki}
       WIKI_ADMIN_GROUP: ${WIKI_ADMIN_GROUP:-}
       ATTACHMENTS_DIR: /data/attachments
+      # 첨부 저장 드라이버 — s3면 아래 S3_* 를 채운다 (volumes의 attachments는 local일 때만 쓰임)
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
     volumes:
       - attachments:/data/attachments
     ports:
