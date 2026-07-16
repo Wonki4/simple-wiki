@@ -48,7 +48,7 @@ export async function addGroupPermission(spaceKey: string, formData: FormData) {
   const group = await prisma.wikiGroup.findUnique({ where: { id: groupId } });
   if (!group) {
     // 드롭다운 우회/경합 케이스 — 크래시 대신 배너로 안내하고 서버 로그를 남긴다.
-    console.warn(`[perm] 그룹 권한 추가 실패 — 존재하지 않는 그룹 (space=${spaceKey}, groupId=${groupId})`);
+    console.warn(`[perm] 그룹 권한 추가 실패 — 존재하지 않는 그룹 (space=${spaceKey}, groupId=${JSON.stringify(groupId)})`);
     redirect(`/s/${spaceKey}/settings?error=${encodeURIComponent("존재하지 않는 그룹입니다.")}`);
   }
 
@@ -69,7 +69,7 @@ export async function addUserPermission(spaceKey: string, formData: FormData) {
   if (!value) redirect(`/s/${spaceKey}/settings?error=${encodeURIComponent("이메일 또는 아이디를 입력하세요.")}`);
   const user = await findUserByEmailOrUsername(value);
   if (!user) {
-    console.warn(`[perm] 사용자 권한 추가 실패 — 사용자 없음 (space=${spaceKey}, 입력=${value})`);
+    console.warn(`[perm] 사용자 권한 추가 실패 — 사용자 없음 (space=${spaceKey}, 입력=${JSON.stringify(value)})`);
     redirect(
       `/s/${spaceKey}/settings?error=${encodeURIComponent(
         "해당 이메일 또는 아이디의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 하며, 아이디 검색은 다음 로그인부터 가능합니다.",

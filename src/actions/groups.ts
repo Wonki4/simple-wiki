@@ -18,7 +18,7 @@ export async function createGroup(formData: FormData) {
   if (!name) redirect(`/groups?error=${encodeURIComponent("그룹 이름을 입력하세요.")}`);
   const dup = await prisma.wikiGroup.findUnique({ where: { name } });
   if (dup) {
-    console.warn(`[perm] 그룹 생성 실패 — 중복 이름 (name=${name})`);
+    console.warn(`[perm] 그룹 생성 실패 — 중복 이름 (name=${JSON.stringify(name)})`);
     redirect(`/groups?error=${encodeURIComponent("이미 존재하는 그룹입니다.")}`);
   }
   await prisma.wikiGroup.create({ data: { name } });
@@ -43,7 +43,7 @@ export async function addGroupMember(groupId: string, formData: FormData) {
   if (!value) redirect(`/groups?error=${encodeURIComponent("이메일 또는 아이디를 입력하세요.")}`);
   const user = await findUserByEmailOrUsername(value);
   if (!user) {
-    console.warn(`[perm] 그룹 멤버 추가 실패 — 사용자 없음 (groupId=${groupId}, 입력=${value})`);
+    console.warn(`[perm] 그룹 멤버 추가 실패 — 사용자 없음 (groupId=${groupId}, 입력=${JSON.stringify(value)})`);
     redirect(
       `/groups?error=${encodeURIComponent(
         "해당 이메일 또는 아이디의 사용자가 없습니다. 사용자가 최소 1회 로그인해야 하며, 아이디 검색은 다음 로그인부터 가능합니다.",
