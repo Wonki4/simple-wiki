@@ -103,7 +103,11 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
   // 파일 첨부 버튼: 순차 업로드 후 커서 위치에 링크 삽입(이미지는 인라인 이미지).
   // 실패하면 성공분 링크는 유지하고 그 파일부터 중단한다.
   async function attachFiles(files: FileList | null) {
-    if (!files || files.length === 0 || !crepeRef.current) return;
+    if (!files || files.length === 0 || !crepeRef.current) {
+      // 에디터 준비 전에 고른 파일도 같은 파일로 재시도할 수 있게 초기화.
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
@@ -123,6 +127,9 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         if (!crepe) break;
         crepe.editor.action(insert(md));
       }
+    } catch {
+      // 네트워크 단절 등 fetch 자체가 거부된 경우 — HTTP 에러와 동일한 방식으로 안내.
+      alert("파일 업로드에 실패했습니다. 네트워크 상태를 확인하세요.");
     } finally {
       setUploading(false);
       // 같은 파일을 연속으로 다시 선택할 수 있도록 초기화.
