@@ -8,16 +8,30 @@ import { createPageInSpace, updatePageInSpace, revertPage } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
 import { invalidatePageCache } from "@/lib/page-render-cache";
 
-export async function createPage(spaceKey: string, formData: FormData) {
+export async function createPage(spaceKey: string, parentSlug: string | null, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
   const title = String(formData.get("title") ?? "").trim();
   const content = String(formData.get("content") ?? "");
+
+  let parentId: string | null = null;
+  if (parentSlug) {
+    const parent = await prisma.page.findUnique({
+      where: { spaceId_slug: { spaceId: space.id, slug: parentSlug } },
+      select: { id: true },
+    });
+    // 부모가 그사이 삭제된 경우 — 조용히 최상위로 만들지 않고 명시적으로 알린다.
+    if (!parent) {
+      redirect(`/s/${spaceKey}/new?error=${encodeURIComponent("부모 문서가 없습니다. 삭제되었을 수 있습니다.")}`);
+    }
+    parentId = parent.id;
+  }
 
   const { slug, created } = await createPageInSpace({
     spaceId: space.id,
     title,
     content,
     authorId: session.userId,
+    parentId,
   });
   // 같은 slug가 이미 있으면 그 페이지의 편집 화면으로 보낸다.
   if (!created) redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`);

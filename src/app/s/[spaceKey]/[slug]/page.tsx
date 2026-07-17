@@ -75,6 +75,12 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
         </div>
         {canEdit && (
           <div className="flex shrink-0 gap-2">
+            <Link
+              href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}
+              className="btn btn-ghost btn-sm"
+            >
+              하위 문서
+            </Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`} className="btn btn-ghost btn-sm">편집</Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">이력</Link>
             <form action={deletePage.bind(null, spaceKey, slug)}>

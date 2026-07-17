@@ -101,6 +101,8 @@ export interface WritePageInput {
   // 편집 출처. 생략 시 "web"(사람). API 토큰 경로는 "api" + 토큰 이름을 넘긴다.
   source?: EditSource;
   viaLabel?: string | null;
+  // 페이지 트리: 부모 페이지 id(null/생략 = 최상위). 같은 스페이스인지는 호출자가 검증한다.
+  parentId?: string | null;
 }
 
 /**
@@ -135,6 +137,7 @@ export async function createPageInSpace(
         updatedById: input.authorId,
         updatedSource: source,
         updatedViaLabel: viaLabel,
+        parentId: input.parentId ?? null,
       },
     });
     await tx.pageRevision.create({
