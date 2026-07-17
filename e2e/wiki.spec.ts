@@ -409,3 +409,32 @@ test("웹 충돌 UX: 외부 수정 후 저장하면 충돌 배너, 재저장은 
     await fetch(`/api/spaces/eng/pages/${slug}`, { method: "DELETE" });
   }, slug);
 });
+
+test("파일 첨부: 버튼으로 올리고 본문 다운로드 링크로 확인", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+  await page.goto("/s/eng/new");
+  await page.locator('input[name="title"]').fill("파일 첨부 테스트");
+
+  // 에디터(Crepe) 비동기 초기화가 끝나기 전의 change 이벤트는 무시된다(crepeRef 가드).
+  // 다른 에디터 테스트처럼 본문 클릭으로 초기화 완료를 기다리고 커서도 본문에 둔다.
+  await page.locator(".milkdown .ProseMirror").click();
+
+  // 숨긴 파일 input은 form 직계 자식 — Crepe 내부의 이미지 input과 구분된다.
+  await page.locator('form > input[type="file"]').setInputFiles({
+    name: "spec.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("hello attachment"),
+  });
+  // 업로드 완료 → 에디터 본문에 링크 텍스트 삽입 확인
+  await expect(page.locator(".wysiwyg").getByText("spec.txt")).toBeVisible();
+
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("heading", { name: "파일 첨부 테스트" })).toBeVisible();
+
+  // 읽기 화면의 링크가 attachment로 내려오는지 (인라인 아님 = 다운로드)
+  const href = await page.getByRole("link", { name: "spec.txt" }).getAttribute("href");
+  expect(href).toMatch(/^\/api\/attachments\//);
+  const res = await page.request.get(href!);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["content-disposition"] ?? "").toContain("attachment");
+});
