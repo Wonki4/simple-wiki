@@ -48,11 +48,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           `[auth] signIn sub=${p.sub} user=${p.preferred_username ?? p.email ?? ""} realm_roles=${JSON.stringify(p.realm_roles ?? null)} realm_access.roles=${JSON.stringify(p.realm_access?.roles ?? null)} resource_access[${clientId}].roles=${JSON.stringify(p.resource_access?.[clientId]?.roles ?? null)} groups=${JSON.stringify(p.groups ?? null)} -> isWikiAdmin=${isWikiAdmin}`
         );
         const name = p.name ?? p.preferred_username ?? "";
+        // 재생성된 Keycloak 계정(sub는 바뀌고 username은 동일) 등으로 다른 행이
+        // username을 점유하고 있으면 upsert가 P2002로 실패해 로그인 자체가 막힌다 — 선점 해제.
+        if (p.preferred_username) {
+          await prisma.user.updateMany({
+            where: { username: p.preferred_username, NOT: { id: p.sub } },
+            data: { username: null },
+          });
+        }
         // 프로필과 관리자 판정 스냅샷을 User에 저장 — 스페이스 권한은 WikiGroup(DB)에서 판정한다.
         await prisma.user.upsert({
           where: { id: p.sub },
-          update: { email: p.email ?? "", name, isWikiAdmin },
-          create: { id: p.sub, email: p.email ?? "", name, isWikiAdmin },
+          update: { email: p.email ?? "", name, username: p.preferred_username ?? null, isWikiAdmin },
+          create: { id: p.sub, email: p.email ?? "", name, username: p.preferred_username ?? null, isWikiAdmin },
         });
       }
       return token;

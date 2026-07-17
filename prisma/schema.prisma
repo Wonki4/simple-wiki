@@ -17,6 +17,9 @@ model User {
   id        String   @id
   email     String   @default("")
   name      String   @default("")
+  // Keycloak 로그인 아이디(preferred_username). 권한 부여 시 이메일 대신 검색하는 용도.
+  // 이 컬럼 도입 전 마지막 로그인 사용자는 다음 로그인까지 null이다.
+  username  String?  @unique
   // 로그인 시점의 관리자 판정 스냅샷. API 토큰 요청이 이 값으로 전역 관리자를 판정한다.
   isWikiAdmin Boolean  @default(false)
   createdAt DateTime @default(now())
