@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
 import { invalidatePageCache } from "@/lib/page-render-cache";
+import { selfAndDescendantIds } from "@/lib/page-tree";
 import {
   appendContent,
   applyReplace,
@@ -265,4 +266,35 @@ export async function revertPage(input: {
     viaLabel: input.viaLabel ?? null,
   });
   return { found: true, version };
+}
+
+export type MovePageResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "parent-not-found" | "cycle" };
+
+/**
+ * 페이지를 트리에서 이동한다(parentSlug=null이면 최상위). 본문 불변 — 리비전을 만들지 않는다.
+ * 자기 자신·자손으로의 이동(순환)과 타 스페이스 부모는 거부한다.
+ */
+export async function movePageInSpace(input: {
+  spaceId: string;
+  slug: string;
+  parentSlug: string | null;
+}): Promise<MovePageResult> {
+  const pages = await prisma.page.findMany({
+    where: { spaceId: input.spaceId },
+    select: { id: true, slug: true, parentId: true },
+  });
+  const page = pages.find((p) => p.slug === input.slug);
+  if (!page) return { ok: false, reason: "not-found" };
+
+  let parentId: string | null = null;
+  if (input.parentSlug !== null) {
+    const parent = pages.find((p) => p.slug === input.parentSlug);
+    if (!parent) return { ok: false, reason: "parent-not-found" };
+    if (selfAndDescendantIds(pages, page.id).has(parent.id)) return { ok: false, reason: "cycle" };
+    parentId = parent.id;
+  }
+  await prisma.page.update({ where: { id: page.id }, data: { parentId } });
+  return { ok: true };
 }

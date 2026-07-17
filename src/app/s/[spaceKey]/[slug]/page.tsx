@@ -3,7 +3,7 @@ import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { getRenderedPageHtml } from "@/lib/page-render-cache";
-import { deletePage } from "@/actions/pages";
+import { deletePage, movePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EditSourceBadge } from "@/components/EditSourceBadge";
 import { LikeButton } from "@/components/LikeButton";
@@ -11,9 +11,17 @@ import { getLikeState } from "@/lib/likes";
 import { listComments } from "@/lib/comments";
 import { deleteComment } from "@/actions/comments";
 import { CommentForm } from "@/components/CommentForm";
+import { buildTree, flattenTree, selfAndDescendantIds } from "@/lib/page-tree";
 
-export default async function PageView({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
+export default async function PageView({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ spaceKey: string; slug: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { spaceKey, slug: rawSlug } = await params;
+  const { error } = await searchParams;
   const slug = decodeURIComponent(rawSlug);
   const { session, space, role } = await requireSpaceRole(spaceKey, "viewer");
   const canEdit = hasRole(role, "editor");
@@ -57,8 +65,26 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
     include: { fromPage: { select: { title: true, slug: true } } },
   });
 
+  // 이동 드롭다운: 자기 자신·자손 제외한 전체 문서(트리 순서·들여쓰기)
+  const allPages = canEdit
+    ? await prisma.page.findMany({
+        where: { spaceId: space.id },
+        select: { id: true, slug: true, title: true, parentId: true },
+      })
+    : [];
+  const blocked = canEdit ? selfAndDescendantIds(allPages, page.id) : new Set<string>();
+  const moveTargets = canEdit
+    ? flattenTree(buildTree(allPages)).filter((t) => !blocked.has(t.id))
+    : [];
+  const currentParentSlug = allPages.find((p) => p.id === page.parentId)?.slug ?? "";
+
   return (
     <main className="py-10">
+      {error && (
+        <div className="notice notice-warn mb-4" role="alert">
+          {error}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href={`/s/${spaceKey}`} className="crumb">
@@ -83,6 +109,17 @@ export default async function PageView({ params }: { params: Promise<{ spaceKey:
             </Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`} className="btn btn-ghost btn-sm">편집</Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">이력</Link>
+            <form action={movePage.bind(null, spaceKey, slug)} className="flex items-center gap-1">
+              <select name="parent" defaultValue={currentParentSlug} className="select w-auto" aria-label="이동할 위치">
+                <option value="">(최상위)</option>
+                {moveTargets.map((t) => (
+                  <option key={t.id} value={t.slug}>
+                    {"  ".repeat(t.depth) + t.title}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-ghost btn-sm">이동</button>
+            </form>
             <form action={deletePage.bind(null, spaceKey, slug)}>
               <ConfirmSubmitButton message="이 페이지를 삭제할까요?" className="btn btn-danger btn-sm">
                 삭제
