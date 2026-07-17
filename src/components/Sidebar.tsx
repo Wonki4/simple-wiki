@@ -1,21 +1,18 @@
 import Link from "next/link";
 import { NavLink } from "@/components/NavLink";
 import { SidebarDocs } from "@/components/SidebarDocs";
+import type { TreePageInput } from "@/lib/page-tree";
 
 interface SpaceItem {
   key: string;
   name: string;
-}
-interface PageItem {
-  slug: string;
-  title: string;
 }
 
 interface Props {
   spaces: SpaceItem[];
   currentKey: string;
   currentName: string;
-  pages: PageItem[];
+  pages: TreePageInput[];
   canEdit: boolean;
   canManage: boolean;
   isWikiAdmin: boolean;

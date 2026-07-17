@@ -254,6 +254,17 @@ mark {
   font-size: 0.82rem;
   color: var(--faint);
 }
+.lnb__twisty {
+  width: 16px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted, #888);
+  font-size: 10px;
+  cursor: pointer;
+  text-align: center;
+}
 .shell__content {
   flex: 1;
   min-width: 0;
