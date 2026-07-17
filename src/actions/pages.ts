@@ -4,9 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSpaceRole } from "@/lib/access";
-import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace } from "@/lib/pages";
+import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace, deletePageInSpace } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
-import { invalidatePageCache } from "@/lib/page-render-cache";
 
 export async function createPage(spaceKey: string, parentSlug: string | null, formData: FormData) {
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
@@ -100,18 +99,7 @@ export async function movePage(spaceKey: string, slug: string, formData: FormDat
 
 export async function deletePage(spaceKey: string, slug: string) {
   const { space } = await requireSpaceRole(spaceKey, "editor");
-  const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
-    select: { id: true, parentId: true },
-  });
-  if (page) {
-    // 자식은 삭제 문서의 부모로 승격 — 하위 내용이 함께 사라지지 않는다.
-    await prisma.$transaction([
-      prisma.page.updateMany({ where: { parentId: page.id }, data: { parentId: page.parentId } }),
-      prisma.page.delete({ where: { id: page.id } }),
-    ]);
-    invalidatePageCache(page.id);
-  }
+  await deletePageInSpace({ spaceId: space.id, slug });
   revalidatePath(`/s/${spaceKey}`);
   redirect(`/s/${spaceKey}`);
 }

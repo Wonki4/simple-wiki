@@ -268,6 +268,24 @@ export async function revertPage(input: {
   return { found: true, version };
 }
 
+/**
+ * 페이지 삭제 — 자식은 삭제 문서의 부모로 승격한다(트리 내용 보존).
+ * 웹 액션과 REST DELETE가 공유하는 유일한 삭제 경로.
+ */
+export async function deletePageInSpace(input: { spaceId: string; slug: string }): Promise<{ found: boolean }> {
+  const page = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+    select: { id: true, parentId: true },
+  });
+  if (!page) return { found: false };
+  await prisma.$transaction([
+    prisma.page.updateMany({ where: { parentId: page.id }, data: { parentId: page.parentId } }),
+    prisma.page.delete({ where: { id: page.id } }),
+  ]);
+  invalidatePageCache(page.id);
+  return { found: true };
+}
+
 export type MovePageResult =
   | { ok: true }
   | { ok: false; reason: "not-found" | "parent-not-found" | "cycle" };

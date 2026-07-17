@@ -11,12 +11,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ spaceKey: s
 
   const pages = await prisma.page.findMany({
     where: { spaceId: auth.space.id },
-    orderBy: { updatedAt: "desc" },
-    select: { slug: true, title: true, updatedAt: true },
+    orderBy: { title: "asc" },
+    select: { slug: true, title: true, updatedAt: true, parent: { select: { slug: true } } },
   });
   return Response.json({
     space: { key: auth.space.key, name: auth.space.name },
-    pages,
+    pages: pages.map((p) => ({
+      slug: p.slug,
+      title: p.title,
+      updatedAt: p.updatedAt,
+      parentSlug: p.parent?.slug ?? null,
+    })),
   });
 }
 
@@ -27,7 +32,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   const auth = await requireApiSpaceRole(req, spaceKey, "editor");
   if (!auth.ok) return auth.response;
 
-  let body: { title?: unknown; content?: unknown };
+  let body: { title?: unknown; content?: unknown; parent?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -35,6 +40,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   }
   const title = typeof body.title === "string" ? body.title : "";
   const content = typeof body.content === "string" ? body.content : "";
+
+  const parentSlug = typeof body.parent === "string" && body.parent !== "" ? body.parent : null;
+  let parentId: string | null = null;
+  if (parentSlug) {
+    const parent = await prisma.page.findUnique({
+      where: { spaceId_slug: { spaceId: auth.space.id, slug: parentSlug } },
+      select: { id: true },
+    });
+    if (!parent) {
+      return Response.json({ error: "부모 문서가 없습니다." }, { status: 422 });
+    }
+    parentId = parent.id;
+  }
 
   let result;
   try {
@@ -45,6 +63,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
       authorId: auth.actor.userId,
       source: auth.actor.via === "token" ? "api" : "web",
       viaLabel: auth.actor.via === "token" ? auth.actor.tokenName : null,
+      parentId,
     });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "생성 실패" }, { status: 400 });

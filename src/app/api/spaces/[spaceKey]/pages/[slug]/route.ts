@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireApiSpaceRole } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { updatePageInSpace } from "@/lib/pages";
+import { updatePageInSpace, deletePageInSpace } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
 
 // GET /api/spaces/{spaceKey}/pages/{slug} — 페이지 마크다운 원문
@@ -118,9 +118,7 @@ export async function DELETE(
   const auth = await requireApiSpaceRole(req, spaceKey, "editor");
   if (!auth.ok) return auth.response;
 
-  const { count } = await prisma.page.deleteMany({
-    where: { spaceId: auth.space.id, slug },
-  });
-  if (count === 0) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
+  const result = await deletePageInSpace({ spaceId: auth.space.id, slug });
+  if (!result.found) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
   return Response.json({ deleted: true, slug });
 }
