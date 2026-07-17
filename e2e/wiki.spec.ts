@@ -438,3 +438,42 @@ test("파일 첨부: 버튼으로 올리고 본문 다운로드 링크로 확인
   expect(res.status()).toBe(200);
   expect(res.headers()["content-disposition"] ?? "").toContain("attachment");
 });
+
+test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 이동 → 삭제 승격", async ({ page }) => {
+  await login(page, "alice", "alice1234");
+
+  // 부모 문서 생성
+  await page.goto("/s/eng/new");
+  await page.locator('input[name="title"]').fill("트리 부모");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("heading", { name: "트리 부모" })).toBeVisible();
+
+  // "하위 문서" 버튼으로 자식 생성
+  await page.getByRole("link", { name: "하위 문서" }).click();
+  await expect(page.getByText("'트리 부모' 하위에 만듭니다.")).toBeVisible();
+  await page.locator('input[name="title"]').fill("트리 자식");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
+
+  // 사이드바에서 자식이 부모 아래 들여쓰기로 보인다 (접기 토글 존재로 부모 확인)
+  const sidebar = page.locator(".lnb__docs");
+  await expect(sidebar.getByRole("button", { name: "접기" }).first()).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "트리 자식" })).toBeVisible();
+
+  // 자식을 최상위로 이동
+  const moveForm = page.locator('form:has(select[name="parent"])');
+  await moveForm.locator('select[name="parent"]').selectOption({ label: "(최상위)" });
+  await moveForm.getByRole("button", { name: "이동" }).click();
+  await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
+
+  // 삭제 승격: 부모("트리 부모")를 방금 최상위가 된 자식("트리 자식") 아래로 옮긴 뒤 삭제해도
+  // 트리 자식은 살아있고 최상위 구조가 유지된다.
+  await page.goto("/s/eng/트리-부모");
+  await page.locator('form:has(select[name="parent"])').locator('select[name="parent"]').selectOption({ label: "트리 자식" });
+  await page.locator('form:has(select[name="parent"])').getByRole("button", { name: "이동" }).click();
+  // 이 페이지에는 댓글이 없어 "삭제" 버튼은 문서 삭제 버튼 하나뿐이다.
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "삭제" }).click();
+  await page.goto("/s/eng/트리-자식");
+  await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
+});

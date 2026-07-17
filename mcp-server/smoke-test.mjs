@@ -56,6 +56,20 @@ console.log("\n[get_page 없는문서] isError=%s (true 기대)\n%s", notFound.i
 const denied = await call("create_page", { space: "notice", title: "몰래", content: "x" });
 console.log("\n[create_page notice(viewer)] isError=%s (true/403 기대)\n%s", denied.isError, denied.text.slice(0, 120));
 
+// 페이지 트리 라운드트립: 생성(parent)/list(트리 표기)/move/순환 거부
+const parentPage = await call("create_page", { space: "eng", title: "MCP 트리 부모", content: "부모" });
+const parentSlug = JSON.parse(parentPage.text).slug;
+const childPage = await call("create_page", { space: "eng", title: "MCP 트리 자식", content: "자식", parent: parentSlug });
+const childSlug = JSON.parse(childPage.text).slug;
+const treeList = await call("list_pages", { space: "eng" });
+console.log("\n[list_pages tree] isError=%s\n%s", treeList.isError, treeList.text.slice(0, 400));
+const moved = await call("move_page", { space: "eng", slug: childSlug });
+console.log("\n[move_page → 최상위] isError=%s\n%s", moved.isError, moved.text);
+const cycle = await call("move_page", { space: "eng", slug: parentSlug, parent: parentSlug });
+console.log("\n[move_page 순환] isError=%s (true 기대)\n%s", cycle.isError, cycle.text.slice(0, 120));
+await call("delete_page", { space: "eng", slug: childSlug });
+await call("delete_page", { space: "eng", slug: parentSlug });
+
 // 정리: 방금 만든 테스트 문서 삭제
 const del = await call("delete_page", { space: "eng", slug });
 console.log("\n[delete_page] isError=%s\n%s", del.isError, del.text);
