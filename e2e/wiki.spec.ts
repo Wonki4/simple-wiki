@@ -439,41 +439,64 @@ test("파일 첨부: 버튼으로 올리고 본문 다운로드 링크로 확인
   expect(res.headers()["content-disposition"] ?? "").toContain("attachment");
 });
 
-test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 이동 → 삭제 승격", async ({ page }) => {
+test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 삭제 승격 → 이동", async ({ page, browser }) => {
   await login(page, "alice", "alice1234");
+  const moveForm = () => page.locator('form:has(select[name="parent"])');
 
-  // 부모 문서 생성
+  // 이동/삭제 서버액션은 revalidate 범위가 좁아 같은 세션에서 대상 페이지를 재방문하면
+  // 라우터 캐시가 옛 렌더를 준다. 새 컨텍스트의 첫 방문으로 persist된 parent를 읽어 검증한다.
+  async function parentValueFresh(slug: string): Promise<string> {
+    const ctx = await browser.newContext();
+    try {
+      const p = await ctx.newPage();
+      await login(p, "alice", "alice1234");
+      await p.goto(`/s/eng/${slug}`);
+      await expect(p.getByRole("heading").first()).toBeVisible();
+      return await p.locator('form:has(select[name="parent"]) select[name="parent"]').inputValue();
+    } finally {
+      await ctx.close();
+    }
+  }
+
+  // 조부모 → 부모 → 자식 3레벨 트리를 "하위 문서" 버튼으로 만든다.
   await page.goto("/s/eng/new");
+  await page.locator('input[name="title"]').fill("트리 조부모");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByRole("heading", { name: "트리 조부모" })).toBeVisible();
+
+  await page.getByRole("link", { name: "하위 문서" }).click();
+  await expect(page.getByText("'트리 조부모' 하위에 만듭니다.")).toBeVisible();
   await page.locator('input[name="title"]').fill("트리 부모");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "트리 부모" })).toBeVisible();
 
-  // "하위 문서" 버튼으로 자식 생성
   await page.getByRole("link", { name: "하위 문서" }).click();
   await expect(page.getByText("'트리 부모' 하위에 만듭니다.")).toBeVisible();
   await page.locator('input[name="title"]').fill("트리 자식");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
 
-  // 사이드바에서 자식이 부모 아래 들여쓰기로 보인다 (접기 토글 존재로 부모 확인)
+  // 사이드바: 자식이 트리 안에 들여쓰기로 보이고 접기 토글이 존재한다.
   const sidebar = page.locator(".lnb__docs");
   await expect(sidebar.getByRole("button", { name: "접기" }).first()).toBeVisible();
   await expect(sidebar.getByRole("link", { name: "트리 자식" })).toBeVisible();
 
-  // 자식을 최상위로 이동
-  const moveForm = page.locator('form:has(select[name="parent"])');
-  await moveForm.locator('select[name="parent"]').selectOption({ label: "(최상위)" });
-  await moveForm.getByRole("button", { name: "이동" }).click();
-  await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
+  // 방금 만든 자식 페이지(새 렌더)에서 현재 부모가 "트리 부모"로 보인다.
+  await expect(moveForm().locator('select[name="parent"]')).toHaveValue("트리-부모");
 
-  // 삭제 승격: 부모("트리 부모")를 방금 최상위가 된 자식("트리 자식") 아래로 옮긴 뒤 삭제해도
-  // 트리 자식은 살아있고 최상위 구조가 유지된다.
+  // 삭제 승격: 자식이 달린 "트리 부모"(부모=트리 조부모)를 삭제하면 자식은 사라지지 않고
+  // 최상위(FK SET NULL)가 아니라 삭제된 노드의 부모인 "트리 조부모"로 승격된다.
   await page.goto("/s/eng/트리-부모");
-  await page.locator('form:has(select[name="parent"])').locator('select[name="parent"]').selectOption({ label: "트리 자식" });
-  await page.locator('form:has(select[name="parent"])').getByRole("button", { name: "이동" }).click();
-  // 이 페이지에는 댓글이 없어 "삭제" 버튼은 문서 삭제 버튼 하나뿐이다.
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "삭제" }).click();
+  await expect(page).toHaveURL(/\/s\/eng$/);
+  expect(await parentValueFresh("트리-자식")).toBe("트리-조부모");
+
+  // 이동: 승격된 자식을 최상위로 옮긴다(웹 이동 액션). 새 컨텍스트로 persist 확인.
   await page.goto("/s/eng/트리-자식");
-  await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
+  await moveForm().locator('select[name="parent"]').selectOption({ label: "(최상위)" });
+  await moveForm().getByRole("button", { name: "이동" }).click();
+  // 이동 서버액션은 자식 페이지로 redirect한다(완료 대기). 검증은 새 컨텍스트로.
+  await page.waitForURL((u) => u.pathname.includes(encodeURIComponent("트리-자식")));
+  expect(await parentValueFresh("트리-자식")).toBe("");
 });
