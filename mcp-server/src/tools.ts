@@ -22,6 +22,11 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 - 특정 버전 원문은 get_page(space, slug, version)로 읽습니다.
 - revert_page(space, slug, version)는 과거 버전 내용을 새 리비전으로 복원합니다(이력은 보존).
 
+트리:
+- 문서는 스페이스 안에서 부모-자식 트리를 이룹니다. list_pages의 들여쓰기가 구조입니다.
+- 새 문서를 만들 때 관련 상위 문서가 있으면 create_page의 parent로 그 slug를 지정하세요.
+- move_page로 위치를 바꿀 수 있습니다. 이동해도 slug/링크는 변하지 않습니다.
+
 규칙:
 - 권한은 토큰 소유자의 스페이스 권한을 따릅니다. 읽을 수 없는 스페이스는 목록·조회 모두 404로 숨겨집니다.
 - 문서 사이 링크는 위키링크 문법 [[문서 제목]]을 씁니다.
@@ -68,7 +73,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
   }
 
   const server = new McpServer(
-    { name: "simple-wiki", version: "1.2.0" },
+    { name: "simple-wiki", version: "1.3.0" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
@@ -87,10 +92,35 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     "list_pages",
     {
       title: "페이지 목록",
-      description: "특정 스페이스의 페이지 목록(제목/slug/수정시각)을 반환합니다.",
+      description:
+        "특정 스페이스의 페이지 트리를 반환합니다. 들여쓰기가 부모-자식 관계이며, 각 항목에 slug와 parentSlug가 있습니다.",
       inputSchema: { space: z.string().describe("스페이스 키 (예: eng). list_spaces의 key 값)") },
     },
-    async ({ space }) => toResult(await api(`/api/spaces/${encodeURIComponent(space)}/pages`)),
+    async ({ space }) => {
+      const r = await api(`/api/spaces/${encodeURIComponent(space)}/pages`);
+      if (!r.ok) return toResult(r);
+      const data = r.data as {
+        space: unknown;
+        pages: { slug: string; title: string; parentSlug: string | null }[];
+      };
+      // 들여쓰기 트리 텍스트 구성 (형제는 API 순서 = 제목순)
+      const children = new Map<string | null, typeof data.pages>();
+      for (const p of data.pages) {
+        const key = p.parentSlug ?? null;
+        const arr = children.get(key) ?? [];
+        arr.push(p);
+        children.set(key, arr);
+      }
+      const lines: string[] = [];
+      const walk = (parent: string | null, depth: number) => {
+        for (const p of children.get(parent) ?? []) {
+          lines.push(`${"  ".repeat(depth)}- ${p.title} (slug: ${p.slug})`);
+          walk(p.slug, depth + 1);
+        }
+      };
+      walk(null, 0);
+      return { content: [{ type: "text" as const, text: JSON.stringify(data.space) + "\n" + lines.join("\n") }] };
+    },
   );
 
   server.registerTool(
@@ -134,13 +164,14 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
         space: z.string().describe("스페이스 키"),
         title: z.string().describe("페이지 제목"),
         content: z.string().optional().describe("마크다운 본문 (생략 시 빈 문서)"),
+        parent: z.string().optional().describe("부모 페이지 slug(생략 시 최상위). 페이지 트리의 위치를 정합니다."),
       },
     },
-    async ({ space, title, content }) =>
+    async ({ space, title, content, parent }) =>
       toResult(
         await api(`/api/spaces/${encodeURIComponent(space)}/pages`, {
           method: "POST",
-          body: JSON.stringify({ title, content: content ?? "" }),
+          body: JSON.stringify({ title, content: content ?? "", parent }),
         }),
       ),
   );
@@ -245,6 +276,27 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
           method: "POST",
           body: JSON.stringify({ version, expectedVersion }),
         }),
+      ),
+  );
+
+  server.registerTool(
+    "move_page",
+    {
+      title: "페이지 이동",
+      description:
+        "페이지를 트리에서 이동합니다(editor 권한). parent에 부모 slug를 주거나, 최상위로 옮기려면 생략합니다. 자기 자신/하위로는 이동할 수 없습니다(422).",
+      inputSchema: {
+        space: z.string().describe("스페이스 키"),
+        slug: z.string().describe("이동할 페이지 slug"),
+        parent: z.string().optional().describe("부모 페이지 slug(생략 시 최상위)"),
+      },
+    },
+    async ({ space, slug, parent }) =>
+      toResult(
+        await api(
+          `/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/move`,
+          { method: "POST", body: JSON.stringify({ parent: parent ?? null }) },
+        ),
       ),
   );
 

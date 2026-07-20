@@ -146,6 +146,12 @@ model Page {
   updatedViaLabel String?               // api일 때 토큰 이름(예: "Claude Desktop")
   // 낙관적 잠금·이력용 현재 버전. 항상 최신 PageRevision.version과 같다.
   version         Int                   @default(1)
+  // 페이지 트리: 같은 스페이스 안의 부모 문서(null=최상위). 순환·타 스페이스 부모는
+  // 앱(lib/pages.ts movePageInSpace, createPageInSpace)에서 검증한다.
+  // 부모 삭제 시 자식은 deletePage가 조부모로 승격한다.
+  parentId  String?
+  parent    Page?   @relation("PageTree", fields: [parentId], references: [id])
+  children  Page[]  @relation("PageTree")
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
   revisions    PageRevision[]
@@ -157,6 +163,7 @@ model Page {
   @@index([searchVector], type: Gin)
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_title_trgm_idx")
   @@index([content(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_content_trgm_idx")
+  @@index([parentId])
 }
 
 model PageRevision {

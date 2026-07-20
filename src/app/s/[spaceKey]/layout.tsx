@@ -17,8 +17,8 @@ export default async function SpaceLayout({
     listReadableSpaces(session),
     prisma.page.findMany({
       where: { spaceId: space.id },
-      orderBy: { updatedAt: "desc" },
-      select: { slug: true, title: true },
+      orderBy: { title: "asc" },
+      select: { id: true, slug: true, title: true, parentId: true },
     }),
   ]);
 

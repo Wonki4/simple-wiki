@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
 import { invalidatePageCache } from "@/lib/page-render-cache";
+import { selfAndDescendantIds } from "@/lib/page-tree";
 import {
   appendContent,
   applyReplace,
@@ -101,6 +102,8 @@ export interface WritePageInput {
   // 편집 출처. 생략 시 "web"(사람). API 토큰 경로는 "api" + 토큰 이름을 넘긴다.
   source?: EditSource;
   viaLabel?: string | null;
+  // 페이지 트리: 부모 페이지 id(null/생략 = 최상위). 같은 스페이스인지는 호출자가 검증한다.
+  parentId?: string | null;
 }
 
 /**
@@ -135,6 +138,7 @@ export async function createPageInSpace(
         updatedById: input.authorId,
         updatedSource: source,
         updatedViaLabel: viaLabel,
+        parentId: input.parentId ?? null,
       },
     });
     await tx.pageRevision.create({
@@ -262,4 +266,53 @@ export async function revertPage(input: {
     viaLabel: input.viaLabel ?? null,
   });
   return { found: true, version };
+}
+
+/**
+ * 페이지 삭제 — 자식은 삭제 문서의 부모로 승격한다(트리 내용 보존).
+ * 웹 액션과 REST DELETE가 공유하는 유일한 삭제 경로.
+ */
+export async function deletePageInSpace(input: { spaceId: string; slug: string }): Promise<{ found: boolean }> {
+  const page = await prisma.page.findUnique({
+    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+    select: { id: true, parentId: true },
+  });
+  if (!page) return { found: false };
+  await prisma.$transaction([
+    prisma.page.updateMany({ where: { parentId: page.id }, data: { parentId: page.parentId } }),
+    prisma.page.delete({ where: { id: page.id } }),
+  ]);
+  invalidatePageCache(page.id);
+  return { found: true };
+}
+
+export type MovePageResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "parent-not-found" | "cycle" };
+
+/**
+ * 페이지를 트리에서 이동한다(parentSlug=null이면 최상위). 본문 불변 — 리비전을 만들지 않는다.
+ * 자기 자신·자손으로의 이동(순환)과 타 스페이스 부모는 거부한다.
+ */
+export async function movePageInSpace(input: {
+  spaceId: string;
+  slug: string;
+  parentSlug: string | null;
+}): Promise<MovePageResult> {
+  const pages = await prisma.page.findMany({
+    where: { spaceId: input.spaceId },
+    select: { id: true, slug: true, parentId: true },
+  });
+  const page = pages.find((p) => p.slug === input.slug);
+  if (!page) return { ok: false, reason: "not-found" };
+
+  let parentId: string | null = null;
+  if (input.parentSlug !== null) {
+    const parent = pages.find((p) => p.slug === input.parentSlug);
+    if (!parent) return { ok: false, reason: "parent-not-found" };
+    if (selfAndDescendantIds(pages, page.id).has(parent.id)) return { ok: false, reason: "cycle" };
+    parentId = parent.id;
+  }
+  await prisma.page.update({ where: { id: page.id }, data: { parentId } });
+  return { ok: true };
 }
