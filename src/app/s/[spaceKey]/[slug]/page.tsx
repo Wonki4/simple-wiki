@@ -76,7 +76,13 @@ export default async function PageView({
   const moveTargets = canEdit
     ? flattenTree(buildTree(allPages)).filter((t) => !blocked.has(t.id))
     : [];
-  const currentParentSlug = allPages.find((p) => p.id === page.parentId)?.slug ?? "";
+  const currentParent = allPages.find((p) => p.id === page.parentId);
+  const currentParentSlug = currentParent?.slug ?? "";
+  const currentParentLabel = currentParent
+    ? currentParent.title.length > 20
+      ? `${currentParent.title.slice(0, 20)}…`
+      : currentParent.title
+    : "(최상위)";
 
   return (
     <main className="py-10">
@@ -109,27 +115,33 @@ export default async function PageView({
         )}
       </div>
 
-      {/* 제목 줄: 제목 + 위치(이동) 컨트롤만. select와 버튼 높이를 맞춰 정렬한다. */}
+      {/* 제목 줄: 제목 + 위치(이동) 컨트롤만. 네이티브 select 팝업은 위치·크기를 제어할 수
+          없어(OS 렌더링) details 팝오버로 직접 그린다. 각 항목이 곧 submit 버튼이다. */}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1 className="page-title min-w-0">{page.title}</h1>
         {canEdit && (
-          <form action={movePage.bind(null, spaceKey, slug)} className="flex shrink-0 items-stretch gap-1">
-            <select
-              name="parent"
-              defaultValue={currentParentSlug}
-              className="select btn-sm w-auto max-w-[11rem]"
-              aria-label="이동할 위치"
-            >
-              <option value="">(최상위)</option>
+          <details className="move shrink-0" data-parent={currentParentSlug}>
+            <summary className="btn btn-ghost btn-sm" aria-label="이동할 위치">
+              위치: {currentParentLabel} ▾
+            </summary>
+            <form action={movePage.bind(null, spaceKey, slug)} className="move__panel">
+              <button name="parent" value="" className="move__item" disabled={!currentParent}>
+                (최상위)
+              </button>
               {moveTargets.map((t) => (
-                <option key={t.id} value={t.slug}>
-                  {/* 옵션 라벨의 일반 공백은 브라우저가 제거하므로 NBSP로 들여쓴다. 긴 제목은 팝업 폭 폭주 방지로 자른다. */}
-                  {"\u00A0\u00A0".repeat(t.depth) + (t.title.length > 30 ? `${t.title.slice(0, 30)}…` : t.title)}
-                </option>
+                <button
+                  key={t.id}
+                  name="parent"
+                  value={t.slug}
+                  className="move__item"
+                  style={{ paddingLeft: `${0.6 + t.depth * 0.9}rem` }}
+                  disabled={t.slug === currentParentSlug}
+                >
+                  {t.title}
+                </button>
               ))}
-            </select>
-            <button className="btn btn-ghost btn-sm">이동</button>
-          </form>
+            </form>
+          </details>
         )}
       </div>
 
