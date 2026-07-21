@@ -500,3 +500,47 @@ test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 삭제 
   await page.waitForURL((u) => u.pathname.includes(encodeURIComponent("트리-자식")));
   expect(await parentValueFresh("트리-자식")).toBe("");
 });
+
+test("API 토큰으로 첨부 업로드/다운로드", async ({ page, request }) => {
+  await login(page, "alice", "alice1234");
+
+  // 토큰 발급 — 원문은 발급 직후 한 번만 노출된다(data-testid="new-token")
+  await page.goto("/settings/tokens");
+  await page.locator('input[name="name"]').fill("e2e-attach");
+  await page.getByRole("button", { name: "토큰 발급" }).click();
+  const raw = (await page.getByTestId("new-token").textContent())!.trim();
+  expect(raw).toMatch(/^swk_/);
+
+  try {
+    // request 픽스처는 브라우저 쿠키와 무관 → 순수 토큰 인증 경로 검증
+    const body = Buffer.from("mcp attachment e2e " + Date.now());
+    const up = await request.post("/api/spaces/eng/attachments", {
+      headers: { Authorization: `Bearer ${raw}` },
+      multipart: { file: { name: "e2e-attach.txt", mimeType: "text/plain", buffer: body } },
+    });
+    expect(up.status()).toBe(200);
+    const meta = await up.json();
+    expect(meta.url).toMatch(/^\/api\/attachments\//);
+    expect(meta.filename).toBe("e2e-attach.txt");
+
+    const down = await request.get(meta.url, { headers: { Authorization: `Bearer ${raw}` } });
+    expect(down.status()).toBe(200);
+    expect(await down.body()).toEqual(body);
+
+    // 무인증(쿠키도 토큰도 없음)이면 401
+    const anon = await request.post("/api/spaces/eng/attachments", {
+      multipart: { file: { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("x") } },
+    });
+    expect(anon.status()).toBe(401);
+  } finally {
+    // 토큰 정리(행 누적 방지)
+    await page.goto("/settings/tokens");
+    page.once("dialog", (d) => d.accept());
+    await page
+      .locator("tr", { hasText: "e2e-attach" })
+      .first()
+      .getByRole("button", { name: "삭제" })
+      .click();
+    await expect(page.locator("tr", { hasText: "e2e-attach" })).toHaveCount(0);
+  }
+});

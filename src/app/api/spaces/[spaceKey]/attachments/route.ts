@@ -1,24 +1,15 @@
 import { NextRequest } from "next/server";
-import { getSessionInfo } from "@/lib/access";
+import { requireApiSpaceRole } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { hasRole, resolveSpaceRole } from "@/lib/permissions";
 import { storage } from "@/lib/storage";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 
+// 업로드는 웹 세션과 API 토큰(Bearer) 모두 허용한다. 판정·rate limit은 페이지 API와 동일.
 export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: string }> }) {
   const { spaceKey } = await ctx.params;
-  const session = await getSessionInfo();
-  if (!session) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
-
-  const space = await prisma.space.findUnique({
-    where: { key: spaceKey },
-    include: { permissions: true },
-  });
-  if (!space) return Response.json({ error: "스페이스가 없습니다." }, { status: 404 });
-  const role = resolveSpaceRole(session, space.visibility, space.permissions);
-  if (role === null) return Response.json({ error: "스페이스가 없습니다." }, { status: 404 });
-  if (!hasRole(role, "editor")) return Response.json({ error: "편집 권한이 필요합니다." }, { status: 403 });
+  const auth = await requireApiSpaceRole(req, spaceKey, "editor");
+  if (!auth.ok) return auth.response;
 
   const contentLength = Number(req.headers.get("content-length") ?? 0);
   if (contentLength > MAX_SIZE + 1024 * 1024) {
@@ -30,16 +21,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   if (!(file instanceof File)) return Response.json({ error: "file 필드가 필요합니다." }, { status: 400 });
   if (file.size > MAX_SIZE) return Response.json({ error: "20MB 이하만 업로드할 수 있습니다." }, { status: 413 });
 
-  const key = `${space.id}/${crypto.randomUUID()}`;
+  const key = `${auth.space.id}/${crypto.randomUUID()}`;
   await storage.put(key, Buffer.from(await file.arrayBuffer()));
   const att = await prisma.attachment.create({
     data: {
-      spaceId: space.id,
+      spaceId: auth.space.id,
       filename: file.name || "attachment",
       mime: file.type || "application/octet-stream",
       size: file.size,
       storageKey: key,
-      uploaderId: session.userId,
+      uploaderId: auth.actor.userId,
     },
   });
 

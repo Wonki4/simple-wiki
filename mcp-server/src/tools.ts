@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { promises as fs } from "node:fs";
+import { basename, extname } from "node:path";
 
 // ── 서버 사용 지침 (MCP initialize 응답의 instructions로 호스트에 전달된다) ──
 // 모델이 도구를 올바른 순서로 조합해 쓰도록 유도한다.
@@ -27,6 +29,10 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 - 새 문서를 만들 때 관련 상위 문서가 있으면 create_page의 parent로 그 slug를 지정하세요.
 - move_page로 위치를 바꿀 수 있습니다. 이동해도 slug/링크는 변하지 않습니다.
 
+첨부:
+- upload_attachment(space, path)로 파일을 올립니다. path는 이 MCP 서버가 실행 중인 머신의 경로이며 20MB 이하만 가능합니다.
+- 반환된 url을 마크다운으로 본문에 삽입합니다: 이미지는 ![이름](url), 그 외는 [이름](url) (append_to_page/replace_in_page 사용).
+
 규칙:
 - 권한은 토큰 소유자의 스페이스 권한을 따릅니다. 읽을 수 없는 스페이스는 목록·조회 모두 404로 숨겨집니다.
 - 문서 사이 링크는 위키링크 문법 [[문서 제목]]을 씁니다.
@@ -46,6 +52,30 @@ function toResult(r: ApiResult) {
   };
 }
 
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".csv": "text/csv",
+  ".json": "application/json",
+  ".zip": "application/zip",
+  ".mp4": "video/mp4",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+function mimeFor(name: string): string {
+  return MIME_BY_EXT[extname(name).toLowerCase()] ?? "application/octet-stream";
+}
+
 /**
  * 주어진 토큰·주소로 위키 API를 호출하는 MCP 서버를 만든다.
  * stdio(단일 사용자 env 토큰)와 HTTP(요청별 헤더 토큰) 양쪽에서 재사용한다.
@@ -58,7 +88,8 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
       ...init,
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        // FormData는 fetch가 boundary 포함 multipart 헤더를 스스로 설정해야 한다.
+        ...(typeof init?.body === "string" ? { "Content-Type": "application/json" } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -73,7 +104,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
   }
 
   const server = new McpServer(
-    { name: "simple-wiki", version: "1.3.0" },
+    { name: "simple-wiki", version: "1.4.0" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
@@ -316,6 +347,55 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
           method: "DELETE",
         }),
       ),
+  );
+
+  server.registerTool(
+    "upload_attachment",
+    {
+      title: "첨부파일 업로드",
+      description:
+        "로컬 파일을 스페이스 첨부로 업로드합니다(editor 권한, 20MB 이하). path는 이 MCP 서버가 실행 중인 머신의 파일 경로입니다(원격 HTTP 모드라면 그 서버 머신 기준). 반환된 url을 마크다운으로 본문에 삽입하세요.",
+      inputSchema: {
+        space: z.string().describe("스페이스 키"),
+        path: z.string().describe("업로드할 파일의 절대 경로 (MCP 서버 머신 기준)"),
+        filename: z.string().optional().describe("저장할 파일명 (생략 시 경로의 파일명)"),
+      },
+    },
+    async ({ space, path: filePath, filename }) => {
+      const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+      let stat;
+      try {
+        stat = await fs.stat(filePath);
+      } catch {
+        return fail(`파일을 찾을 수 없습니다: ${filePath}`);
+      }
+      if (!stat.isFile()) return fail(`파일이 아닙니다: ${filePath}`);
+      if (stat.size > MAX_UPLOAD_BYTES) {
+        return fail(`20MB 이하만 업로드할 수 있습니다 (${(stat.size / 1024 / 1024).toFixed(1)}MB)`);
+      }
+
+      const name = filename ?? basename(filePath);
+      const mime = mimeFor(name);
+      const form = new FormData();
+      form.append("file", new Blob([new Uint8Array(await fs.readFile(filePath))], { type: mime }), name);
+      const r = await api(`/api/spaces/${encodeURIComponent(space)}/attachments`, {
+        method: "POST",
+        body: form,
+      });
+      if (!r.ok) return toResult(r);
+      const data = r.data as { id: string; url: string; filename: string };
+      const md = mime.startsWith("image/")
+        ? `![${data.filename}](${data.url})`
+        : `[${data.filename}](${data.url})`;
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `업로드 완료: ${JSON.stringify(data)}\n본문 삽입 예: ${md}`,
+          },
+        ],
+      };
+    },
   );
 
   return server;
