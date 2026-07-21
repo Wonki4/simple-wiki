@@ -123,7 +123,8 @@ export default async function PageView({
               <option value="">(최상위)</option>
               {moveTargets.map((t) => (
                 <option key={t.id} value={t.slug}>
-                  {"  ".repeat(t.depth) + t.title}
+                  {/* 옵션 라벨의 일반 공백은 브라우저가 제거하므로 NBSP로 들여쓴다. 긴 제목은 팝업 폭 폭주 방지로 자른다. */}
+                  {"\u00A0\u00A0".repeat(t.depth) + (t.title.length > 30 ? `${t.title.slice(0, 30)}…` : t.title)}
                 </option>
               ))}
             </select>
