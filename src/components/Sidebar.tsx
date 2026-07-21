@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { NavLink } from "@/components/NavLink";
 import { SidebarDocs } from "@/components/SidebarDocs";
+import { SidebarResizer } from "@/components/SidebarResizer";
 import type { TreePageInput } from "@/lib/page-tree";
 
 interface SpaceItem {
@@ -47,6 +48,8 @@ export function Sidebar({ spaces, currentKey, currentName, pages, canEdit, canMa
         canEdit={canEdit}
         canManage={canManage}
       />
+
+      <SidebarResizer />
     </aside>
   );
 }
