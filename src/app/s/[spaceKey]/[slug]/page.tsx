@@ -85,22 +85,13 @@ export default async function PageView({
           {error}
         </div>
       )}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <Link href={`/s/${spaceKey}`} className="crumb">
-            {space.key} / {space.name}
-          </Link>
-          <h1 className="page-title mt-1.5">{page.title}</h1>
-          <p className="meta mt-2">
-            마지막 수정 {page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
-            <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
-          </p>
-          <div className="mt-3">
-            <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
-          </div>
-        </div>
+      {/* 상단 줄: breadcrumb + 문서 액션 버튼. 제목 줄에서 분리해 제목이 눌리지 않게 한다. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <Link href={`/s/${spaceKey}`} className="crumb">
+          {space.key} / {space.name}
+        </Link>
         {canEdit && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-2">
             <Link
               href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}
               className="btn btn-ghost btn-sm"
@@ -109,17 +100,6 @@ export default async function PageView({
             </Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`} className="btn btn-ghost btn-sm">편집</Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">이력</Link>
-            <form action={movePage.bind(null, spaceKey, slug)} className="flex items-center gap-1">
-              <select name="parent" defaultValue={currentParentSlug} className="select w-auto max-w-[9rem]" aria-label="이동할 위치">
-                <option value="">(최상위)</option>
-                {moveTargets.map((t) => (
-                  <option key={t.id} value={t.slug}>
-                    {"  ".repeat(t.depth) + t.title}
-                  </option>
-                ))}
-              </select>
-              <button className="btn btn-ghost btn-sm">이동</button>
-            </form>
             <form action={deletePage.bind(null, spaceKey, slug)}>
               <ConfirmSubmitButton message="이 페이지를 삭제할까요?" className="btn btn-danger btn-sm">
                 삭제
@@ -127,6 +107,37 @@ export default async function PageView({
             </form>
           </div>
         )}
+      </div>
+
+      {/* 제목 줄: 제목 + 위치(이동) 컨트롤만. select와 버튼 높이를 맞춰 정렬한다. */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="page-title min-w-0">{page.title}</h1>
+        {canEdit && (
+          <form action={movePage.bind(null, spaceKey, slug)} className="flex shrink-0 items-stretch gap-1">
+            <select
+              name="parent"
+              defaultValue={currentParentSlug}
+              className="select btn-sm w-auto max-w-[11rem]"
+              aria-label="이동할 위치"
+            >
+              <option value="">(최상위)</option>
+              {moveTargets.map((t) => (
+                <option key={t.id} value={t.slug}>
+                  {"  ".repeat(t.depth) + t.title}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-ghost btn-sm">이동</button>
+          </form>
+        )}
+      </div>
+
+      <p className="meta mt-2">
+        마지막 수정 {page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
+        <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
+      </p>
+      <div className="mt-3">
+        <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>
 
       <article className="prose-wiki mt-7" dangerouslySetInnerHTML={{ __html: html }} />
