@@ -100,7 +100,7 @@ export default async function PageView({
           </div>
         </div>
         {canEdit && (
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
               href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}
               className="btn btn-ghost btn-sm"
@@ -110,7 +110,7 @@ export default async function PageView({
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`} className="btn btn-ghost btn-sm">편집</Link>
             <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">이력</Link>
             <form action={movePage.bind(null, spaceKey, slug)} className="flex items-center gap-1">
-              <select name="parent" defaultValue={currentParentSlug} className="select w-auto" aria-label="이동할 위치">
+              <select name="parent" defaultValue={currentParentSlug} className="select w-auto max-w-[9rem]" aria-label="이동할 위치">
                 <option value="">(최상위)</option>
                 {moveTargets.map((t) => (
                   <option key={t.id} value={t.slug}>
