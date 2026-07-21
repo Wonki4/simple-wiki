@@ -30,8 +30,10 @@ function TreeItem({
   const isCollapsed = collapsed.has(node.id);
   return (
     <div>
-      <div className="flex items-center" style={{ paddingLeft: depth * 12 }}>
-        {hasChildren ? (
+      {/* 토글은 음수 마진으로 들여쓰기 여백에 걸쳐, 문서 텍스트가 스페이스 목록과 같은
+          좌측 라인에서 시작한다(자식 없는 행에 자리 예약 없음). */}
+      <div className="lnb__row" style={{ paddingLeft: depth * 12 }}>
+        {hasChildren && (
           <button
             type="button"
             aria-label={isCollapsed ? "펼치기" : "접기"}
@@ -40,8 +42,6 @@ function TreeItem({
           >
             {isCollapsed ? "▸" : "▾"}
           </button>
-        ) : (
-          <span className="lnb__twisty" aria-hidden="true" />
         )}
         <NavLink href={`/s/${currentKey}/${encodeURIComponent(node.slug)}`}>
           <span className="lnb__name">{node.title}</span>

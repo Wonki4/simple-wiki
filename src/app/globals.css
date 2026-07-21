@@ -128,8 +128,9 @@ mark {
   align-items: flex-start;
 }
 .lnb {
-  flex: 0 0 244px;
-  width: 244px;
+  /* 너비는 리사이저(SidebarResizer)가 --lnb-w로 조절한다 */
+  flex: 0 0 var(--lnb-w, 244px);
+  width: var(--lnb-w, 244px);
   position: sticky;
   top: var(--masthead-h);
   height: calc(100vh - var(--masthead-h));
@@ -158,11 +159,12 @@ mark {
   flex: none;
   padding: 0 0.85rem;
 }
-/* 문서 목록: 여기만 스크롤 */
+/* 문서 목록: 세로만 스크롤. 가로는 이름 말줄임(…)으로 처리 */
 .lnb__docs-list {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.35rem 0.85rem 0.5rem;
 }
 /* 하단 고정: 새 문서 / 스페이스 설정 */
@@ -254,8 +256,20 @@ mark {
   font-size: 0.82rem;
   color: var(--faint);
 }
+/* 트리 행: 항목이 줄어들 수 있어야 이름 말줄임이 동작한다 */
+.lnb__row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.lnb__row > .lnb__item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* 접기 토글: 음수 마진으로 들여쓰기 여백에 걸쳐 텍스트 정렬을 깨지 않는다 */
 .lnb__twisty {
-  width: 16px;
+  width: 14px;
+  margin-left: -14px;
   flex-shrink: 0;
   background: none;
   border: none;
@@ -264,6 +278,21 @@ mark {
   font-size: 10px;
   cursor: pointer;
   text-align: center;
+}
+/* LNB 우측 경계: 드래그로 너비 조절 */
+.lnb__resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  touch-action: none;
+}
+.lnb__resizer:hover,
+.lnb__resizer:active {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .shell__content {
   flex: 1;
