@@ -550,7 +550,6 @@ mark {
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--ink);
-  text-wrap: balance;
 }
 .section-title {
   font-size: 1.05rem;
