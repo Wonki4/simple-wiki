@@ -30,7 +30,8 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 - move_page로 위치를 바꿀 수 있습니다. 이동해도 slug/링크는 변하지 않습니다.
 
 첨부:
-- upload_attachment(space, path)로 파일을 올립니다. path는 이 MCP 서버가 실행 중인 머신의 경로이며 20MB 이하만 가능합니다.
+- upload_attachment로 파일을 올립니다. 입력은 path(MCP 서버 머신의 파일 경로)·content_base64(파일 내용, 4MB 이하)·url(서버가 내려받을 http(s) 주소, 20MB 이하) 중 정확히 하나입니다.
+- 원격(HTTP) 모드에서는 사용자의 로컬 파일 경로가 서버에 보이지 않습니다 — content_base64나 url을 쓰세요.
 - 반환된 url을 마크다운으로 본문에 삽입합니다: 이미지는 ![이름](url), 그 외는 [이름](url) (append_to_page/replace_in_page 사용).
 
 규칙:
@@ -53,6 +54,8 @@ function toResult(r: ApiResult) {
 }
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+// content_base64는 모델 컨텍스트를 통과하므로 서버 상한(20MB)보다 훨씬 작게 잡는다.
+const MAX_CONTENT_BYTES = 4 * 1024 * 1024;
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -104,7 +107,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
   }
 
   const server = new McpServer(
-    { name: "simple-wiki", version: "1.4.0" },
+    { name: "simple-wiki", version: "1.5.0" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
@@ -354,30 +357,106 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     {
       title: "첨부파일 업로드",
       description:
-        "로컬 파일을 스페이스 첨부로 업로드합니다(editor 권한, 20MB 이하). path는 이 MCP 서버가 실행 중인 머신의 파일 경로입니다(원격 HTTP 모드라면 그 서버 머신 기준). 반환된 url을 마크다운으로 본문에 삽입하세요.",
+        "파일을 스페이스 첨부로 업로드합니다(editor 권한, 20MB 이하). 입력은 path·content_base64·url 중 정확히 하나: path는 이 MCP 서버가 실행 중인 머신의 파일 경로(로컬 stdio 실행일 때만 유효), content_base64는 파일 내용 자체(디코드 후 4MB 이하), url은 MCP 서버가 접근 가능한 http(s) 리소스를 서버가 내려받아 올립니다. 반환된 url을 마크다운으로 본문에 삽입하세요.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
-        path: z.string().describe("업로드할 파일의 절대 경로 (MCP 서버 머신 기준)"),
-        filename: z.string().optional().describe("저장할 파일명 (생략 시 경로의 파일명)"),
+        path: z.string().optional().describe("MCP 서버 머신의 파일 절대 경로 (로컬 stdio 모드용)"),
+        content_base64: z.string().optional().describe("파일 내용의 base64 인코딩 (디코드 후 4MB 이하)"),
+        url: z.string().optional().describe("내려받을 http(s) URL — MCP 서버의 네트워크에서 접근 가능해야 함 (20MB·15초 제한)"),
+        filename: z
+          .string()
+          .optional()
+          .describe("저장할 파일명. content_base64면 필수, path/url은 생략 시 경로에서 유도"),
       },
     },
-    async ({ space, path: filePath, filename }) => {
+    async ({ space, path: filePath, content_base64, url, filename }) => {
       const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
-      let stat;
-      try {
-        stat = await fs.stat(filePath);
-      } catch {
-        return fail(`파일을 찾을 수 없습니다: ${filePath}`);
-      }
-      if (!stat.isFile()) return fail(`파일이 아닙니다: ${filePath}`);
-      if (stat.size > MAX_UPLOAD_BYTES) {
-        return fail(`20MB 이하만 업로드할 수 있습니다 (${(stat.size / 1024 / 1024).toFixed(1)}MB)`);
+      const given = [filePath, content_base64, url].filter((v) => v !== undefined);
+      if (given.length !== 1) {
+        return fail("path, content_base64, url 중 정확히 하나만 지정하세요.");
       }
 
-      const name = filename ?? basename(filePath);
-      const mime = mimeFor(name);
+      let bytes: Uint8Array;
+      let name: string;
+      let mime: string | undefined;
+
+      if (filePath !== undefined) {
+        let stat;
+        try {
+          stat = await fs.stat(filePath);
+        } catch {
+          return fail(`파일을 찾을 수 없습니다: ${filePath}`);
+        }
+        if (!stat.isFile()) return fail(`파일이 아닙니다: ${filePath}`);
+        if (stat.size > MAX_UPLOAD_BYTES) {
+          return fail(`20MB 이하만 업로드할 수 있습니다 (${(stat.size / 1024 / 1024).toFixed(1)}MB)`);
+        }
+        bytes = new Uint8Array(await fs.readFile(filePath));
+        name = filename ?? basename(filePath);
+      } else if (content_base64 !== undefined) {
+        if (!filename) return fail("content_base64 업로드에는 filename이 필요합니다.");
+        // 디코드 전에 문자열 길이로 상한을 걸어 거대 입력의 디코드 자체를 피한다 (base64는 원본의 4/3).
+        if (content_base64.length > (MAX_CONTENT_BYTES / 3) * 4 + 4) {
+          return fail(`content_base64는 디코드 후 ${MAX_CONTENT_BYTES / 1024 / 1024}MB 이하만 가능합니다.`);
+        }
+        bytes = new Uint8Array(Buffer.from(content_base64, "base64"));
+        if (bytes.length === 0) return fail("content_base64를 디코드한 결과가 비어 있습니다.");
+        if (bytes.length > MAX_CONTENT_BYTES) {
+          return fail(`content_base64는 디코드 후 ${MAX_CONTENT_BYTES / 1024 / 1024}MB 이하만 가능합니다.`);
+        }
+        name = filename;
+      } else {
+        let parsed: URL;
+        try {
+          parsed = new URL(url as string);
+        } catch {
+          return fail(`URL이 올바르지 않습니다: ${url}`);
+        }
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return fail("http(s) URL만 지원합니다.");
+        }
+        let res: Response;
+        try {
+          res = await fetch(parsed, { signal: AbortSignal.timeout(15_000), redirect: "follow" });
+        } catch (e) {
+          return fail(`URL을 내려받지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        if (!res.ok) return fail(`URL 응답이 실패했습니다 (HTTP ${res.status}).`);
+        const declared = Number(res.headers.get("content-length") ?? 0);
+        if (declared > MAX_UPLOAD_BYTES) {
+          return fail(`20MB 이하만 업로드할 수 있습니다 (content-length ${(declared / 1024 / 1024).toFixed(1)}MB)`);
+        }
+        if (!res.body) return fail("URL 응답 본문이 없습니다.");
+        // content-length가 없거나 거짓일 수 있으니 스트림을 읽으며 상한을 강제한다.
+        const reader = res.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > MAX_UPLOAD_BYTES) {
+            await reader.cancel();
+            return fail("20MB 이하만 업로드할 수 있습니다 (응답이 상한 초과).");
+          }
+          chunks.push(value);
+        }
+        bytes = new Uint8Array(size);
+        let off = 0;
+        for (const c of chunks) {
+          bytes.set(c, off);
+          off += c.length;
+        }
+        const urlName = basename(parsed.pathname);
+        name = filename ?? (urlName || "attachment");
+        const ct = res.headers.get("content-type")?.split(";")[0].trim();
+        if (ct) mime = ct;
+      }
+
+      mime = mime ?? mimeFor(name);
       const form = new FormData();
-      form.append("file", new Blob([new Uint8Array(await fs.readFile(filePath))], { type: mime }), name);
+      // 복사 생성으로 ArrayBuffer 기반 Uint8Array를 보장한다(BlobPart 타입 요구).
+      form.append("file", new Blob([new Uint8Array(bytes)], { type: mime }), name);
       const r = await api(`/api/spaces/${encodeURIComponent(space)}/attachments`, {
         method: "POST",
         body: form,
