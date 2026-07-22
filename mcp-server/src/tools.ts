@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { promises as fs } from "node:fs";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { basename, extname } from "node:path";
 
 // ── 서버 사용 지침 (MCP initialize 응답의 instructions로 호스트에 전달된다) ──
@@ -56,6 +58,51 @@ function toResult(r: ApiResult) {
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 // content_base64는 모델 컨텍스트를 통과하므로 서버 상한(20MB)보다 훨씬 작게 잡는다.
 const MAX_CONTENT_BYTES = 4 * 1024 * 1024;
+
+// url 업로드 SSRF 가드. 서버의 네트워크 위치에서만 닿는 표적(클라우드/k8s 메타데이터,
+// 서버 호스트의 loopback 포트)을 막는다. RFC1918 인트라넷은 허용 — 주 사용처가 사내
+// 리소스이고 호출자(사내 사용자)도 같은 LAN 접근권을 이미 가진다. dns.lookup 후
+// 실제 연결 사이의 rebinding 레이스는 사내 도구 전제로 잔여 위험으로 수용(스펙 기록).
+// 로컬 개발·스모크는 MCP_URL_ALLOW_LOOPBACK=1로 루프백만 예외 허용.
+function isBlockedAddress(addr: string): boolean {
+  const allowLoopback = process.env.MCP_URL_ALLOW_LOOPBACK === "1";
+  const ip = addr.startsWith("::ffff:") ? addr.slice(7) : addr; // v4-mapped v6 정규화
+  if (isIP(ip) === 4) {
+    const [a, b] = ip.split(".").map(Number);
+    if (a === 127) return !allowLoopback;
+    if (a === 169 && b === 254) return true; // link-local·클라우드 메타데이터
+    if (a === 0) return true; // unspecified
+    return false;
+  }
+  const low = ip.toLowerCase();
+  if (low === "::1") return !allowLoopback;
+  if (low === "::") return true;
+  if (/^fe[89ab]/.test(low)) return true; // fe80::/10 link-local
+  if (low.startsWith("fc") || low.startsWith("fd")) return true; // fc00::/7 unique-local
+  return false;
+}
+
+// 훅: 스킴·주소 검증. 문제가 있으면 사용자에게 보여줄 메시지를, 없으면 null을 반환.
+async function assertSafeUrl(u: URL): Promise<string | null> {
+  if (u.protocol !== "http:" && u.protocol !== "https:") return "http(s) URL만 지원합니다.";
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  let addrs: { address: string }[];
+  if (isIP(host)) {
+    addrs = [{ address: host }];
+  } else {
+    try {
+      addrs = await lookup(host, { all: true });
+    } catch {
+      return `호스트를 찾을 수 없습니다: ${host}`;
+    }
+  }
+  for (const { address } of addrs) {
+    if (isBlockedAddress(address)) {
+      return `차단된 주소입니다 (${host} → ${address}): 루프백·링크로컬·메타데이터 대역은 가져올 수 없습니다.`;
+    }
+  }
+  return null;
+}
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -412,14 +459,28 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
         } catch {
           return fail(`URL이 올바르지 않습니다: ${url}`);
         }
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          return fail("http(s) URL만 지원합니다.");
-        }
-        let res: Response;
-        try {
-          res = await fetch(parsed, { signal: AbortSignal.timeout(15_000), redirect: "follow" });
-        } catch (e) {
-          return fail(`URL을 내려받지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+        // 리다이렉트는 수동으로 따라가며 hop마다 스킴·주소를 재검증한다(SSRF 가드 우회 방지).
+        let res: Response | undefined;
+        for (let hop = 0; ; hop++) {
+          const unsafe = await assertSafeUrl(parsed);
+          if (unsafe) return fail(unsafe);
+          try {
+            res = await fetch(parsed, { signal: AbortSignal.timeout(15_000), redirect: "manual" });
+          } catch (e) {
+            return fail(`URL을 내려받지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          if (res.status >= 300 && res.status < 400) {
+            const loc = res.headers.get("location");
+            if (!loc) return fail(`URL 응답이 실패했습니다 (HTTP ${res.status}).`);
+            if (hop >= 3) return fail("리다이렉트가 너무 많습니다 (최대 3회).");
+            try {
+              parsed = new URL(loc, parsed);
+            } catch {
+              return fail(`리다이렉트 대상 URL이 올바르지 않습니다: ${loc}`);
+            }
+            continue;
+          }
+          break;
         }
         if (!res.ok) return fail(`URL 응답이 실패했습니다 (HTTP ${res.status}).`);
         const declared = Number(res.headers.get("content-length") ?? 0);
