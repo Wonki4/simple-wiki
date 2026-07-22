@@ -1,6 +1,6 @@
 {
   "name": "simple-wiki-mcp",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "simple-wiki를 MCP 도구로 노출하는 서버 (stdio + streamable-http). Claude Desktop/Code 등에서 위키를 읽고 씁니다.",
   "private": true,
   "type": "module",
