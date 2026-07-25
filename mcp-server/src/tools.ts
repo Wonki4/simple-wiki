@@ -31,10 +31,15 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 - 새 문서를 만들 때 관련 상위 문서가 있으면 create_page의 parent로 그 slug를 지정하세요.
 - move_page로 위치를 바꿀 수 있습니다. 이동해도 slug/링크는 변하지 않습니다.
 
-첨부:
-- upload_attachment로 파일을 올립니다. 입력은 path(MCP 서버 머신의 파일 경로)·content_base64(파일 내용, 4MB 이하)·url(서버가 내려받을 http(s) 주소, 20MB 이하) 중 정확히 하나입니다.
-- 원격(HTTP) 모드에서는 사용자의 로컬 파일 경로가 서버에 보이지 않습니다 — content_base64나 url을 쓰세요.
-- 반환된 url을 마크다운으로 본문에 삽입합니다: 이미지는 ![이름](url), 그 외는 [이름](url) (append_to_page/replace_in_page 사용).
+첨부 — 파일 업로드는 "안 되는" 것이 아닙니다. 아래 순서로 가능한 경로를 고르세요:
+1. 이 MCP가 파일과 같은 머신에서 돈다면(로컬 stdio 실행) → upload_attachment의 path.
+2. 호스트에 셸이 있고 위키 API 토큰이 환경에 있다면 → REST 직접 업로드가 가장 강력합니다(바이너리·20MB 전부 가능):
+   curl -F "file=@<파일경로>" -H "Authorization: Bearer <토큰>" <위키주소>/api/spaces/<스페이스키>/attachments
+   응답 JSON의 url을 받아 3~5단계 없이 바로 본문 삽입으로 넘어갑니다.
+3. 파일이 http(s) URL로 접근 가능하다면 → upload_attachment의 url (서버가 대신 내려받음, 20MB 이하).
+4. 호스트에 셸이 있고 파일이 4MB 이하라면 → base64로 인코딩해 upload_attachment의 content_base64.
+5. 위 전부 불가(예: 채팅에만 첨부된 바이너리 파일)일 때만 사용자에게 위키 웹 에디터 업로드를 안내하세요.
+- 업로드 후 반환된 url을 마크다운으로 본문에 삽입합니다: 이미지는 ![이름](url), 그 외는 [이름](url) (append_to_page/replace_in_page 사용).
 
 규칙:
 - 권한은 토큰 소유자의 스페이스 권한을 따릅니다. 읽을 수 없는 스페이스는 목록·조회 모두 404로 숨겨집니다.
@@ -154,7 +159,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
   }
 
   const server = new McpServer(
-    { name: "simple-wiki", version: "1.5.0" },
+    { name: "simple-wiki", version: "1.5.1" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
@@ -404,7 +409,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     {
       title: "첨부파일 업로드",
       description:
-        "파일을 스페이스 첨부로 업로드합니다(editor 권한, 20MB 이하). 입력은 path·content_base64·url 중 정확히 하나: path는 이 MCP 서버가 실행 중인 머신의 파일 경로(로컬 stdio 실행일 때만 유효), content_base64는 파일 내용 자체(디코드 후 4MB 이하), url은 MCP 서버가 접근 가능한 http(s) 리소스를 서버가 내려받아 올립니다. 반환된 url을 마크다운으로 본문에 삽입하세요.",
+        "파일을 스페이스 첨부로 업로드합니다(editor 권한, 20MB 이하). 입력은 path·content_base64·url 중 정확히 하나: path는 이 MCP 서버가 실행 중인 머신의 파일 경로(로컬 stdio 실행일 때만 유효), content_base64는 파일 내용 자체(디코드 후 4MB 이하), url은 MCP 서버가 접근 가능한 http(s) 리소스를 서버가 내려받아 올립니다. 반환된 url을 마크다운으로 본문에 삽입하세요. 파일 업로드를 불가능하다고 단정하지 마세요: 로컬 stdio면 path, 호스트에 셸이 있으면 base64 인코딩 후 content_base64(또는 위키 REST에 curl multipart로 직접 업로드), 접근 가능한 주소가 있으면 url로 시도할 수 있습니다.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
         path: z.string().optional().describe("MCP 서버 머신의 파일 절대 경로 (로컬 stdio 모드용)"),
