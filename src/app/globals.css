@@ -34,10 +34,13 @@
 
   --ring: color-mix(in srgb, var(--accent) 55%, transparent);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-    Pretendard, "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular",
-    "JetBrains Mono", Menlo, monospace;
+  /* 웹폰트(Pretendard)를 맨 앞에 둬 OS와 무관하게 같게 보이게 한다.
+     OS 기본 폰트(Windows: 맑은 고딕)는 400/700만 있어 550·650 같은 중간 굵기가 뭉개진다. */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+  /* 고정폭 폰트들엔 한글이 없다 — 코드 속 한글은 OS 폰트 대신 Pretendard로 떨어지게 한다. */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", "JetBrains Mono",
+    Menlo, "Pretendard Variable", monospace;
 
   --radius: 9px;
   --shadow: 0 1px 2px rgba(16, 20, 28, 0.04), 0 4px 16px rgba(16, 20, 28, 0.05);
@@ -74,10 +77,6 @@
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
   }
-}
-
-@theme inline {
-  --font-mono: var(--font-plex-mono);
 }
 
 /* ── Base ─────────────────────────────────────────────────────── */
