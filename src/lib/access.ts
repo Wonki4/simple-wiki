@@ -1,3 +1,4 @@
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { Space, SpacePermission } from "@prisma/client";
 import { auth } from "@/auth";
@@ -28,7 +29,12 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
 
 export async function requireSession(): Promise<SessionInfo> {
   const session = await getSessionInfo();
-  if (!session) redirect("/api/auth/signin");
+  if (!session) {
+    if ((await cookies()).get("swk_manual_logout")?.value === "1") redirect("/");
+    // 만료 후 재로그인하면 보던 페이지로 돌아오도록 현재 경로(middleware가 넣어 줌)를 넘긴다.
+    const path = (await headers()).get("x-pathname") ?? "/";
+    redirect(`/login?callbackUrl=${encodeURIComponent(path)}`);
+  }
   return session;
 }
 

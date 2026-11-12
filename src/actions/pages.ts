@@ -3,11 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireSpaceRole } from "@/lib/access";
+import { getSessionInfo, requireSpaceRole } from "@/lib/access";
 import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace, deletePageInSpace } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
 
 export async function createPage(spaceKey: string, parentSlug: string | null, formData: FormData) {
+  // 에디터가 작성 중인 내용을 보관하고 재로그인할 수 있게 일반 이동 대신 신호를 돌려준다.
+  if (!(await getSessionInfo())) return { authRequired: true as const };
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
   const title = String(formData.get("title") ?? "").trim();
   const content = String(formData.get("content") ?? "");
@@ -39,7 +41,7 @@ export async function createPage(spaceKey: string, parentSlug: string | null, fo
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
 }
 
-export type SaveResult = { conflict: true; currentVersion: number } | void;
+export type SaveResult = { conflict: true; currentVersion: number } | { authRequired: true } | void;
 
 export async function updatePage(
   spaceKey: string,
@@ -51,6 +53,7 @@ export async function updatePage(
   const ev = formData.get("expectedVersion");
   const expectedVersion = typeof ev === "string" && ev !== "" ? Number(ev) : undefined;
 
+  if (!(await getSessionInfo())) return { authRequired: true };
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
   try {
     const result = await updatePageInSpace({

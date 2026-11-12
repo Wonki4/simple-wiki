@@ -6,7 +6,9 @@ import { insert } from "@milkdown/kit/utils";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 
-type SaveResult = { conflict: true; currentVersion: number } | void;
+type SaveResult = { conflict: true; currentVersion: number } | { authRequired: true } | void;
+
+const authDraftKey = () => `simple-wiki:auth-draft:${window.location.pathname}${window.location.search}`;
 
 interface Props {
   spaceKey: string;
@@ -39,12 +41,43 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
   const [conflict, setConflict] = useState(false);
   const holderRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<CrepeType | null>(null);
+  const restoredDraftRef = useRef<{ title: string; content: string; expectedVersion?: number } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let crepe: CrepeType | null = null;
     let destroyed = false;
+    let startingContent = initialContent;
+
+    // 저장 도중 세션이 만료되어 로그인 왕복이 발생한 경우에만 임시 보관한 초안을 복원한다.
+    try {
+      if (!restoredDraftRef.current) {
+        const key = authDraftKey();
+        const raw = sessionStorage.getItem(key);
+        if (raw) {
+          sessionStorage.removeItem(key);
+          const draft = JSON.parse(raw) as { title?: unknown; content?: unknown; expectedVersion?: unknown };
+          if (typeof draft.title === "string" && typeof draft.content === "string") {
+            restoredDraftRef.current = {
+              title: draft.title,
+              content: draft.content,
+              expectedVersion: typeof draft.expectedVersion === "number" ? draft.expectedVersion : undefined,
+            };
+          }
+        }
+      }
+      if (restoredDraftRef.current) {
+        setTitle(restoredDraftRef.current.title);
+        setContent(restoredDraftRef.current.content);
+        startingContent = restoredDraftRef.current.content;
+        if (restoredDraftRef.current.expectedVersion !== undefined) {
+          setExpectedVersion(restoredDraftRef.current.expectedVersion);
+        }
+      }
+    } catch {
+      // 스토리지 차단이나 손상된 초안은 일반 편집 화면을 막지 않는다.
+    }
 
     (async () => {
       const { Crepe } = await import("@milkdown/crepe");
@@ -52,7 +85,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
 
       crepe = new Crepe({
         root: holderRef.current,
-        defaultValue: initialContent,
+        defaultValue: startingContent,
         features: {
           // 위키에는 불필요하고 '$' 입력을 가로채므로 수식은 끈다.
           [Crepe.Feature.Latex]: false,
@@ -145,6 +178,22 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         setSaving(true);
         try {
           const result = await onSave(fd);
+          if (result && "authRequired" in result) {
+            try {
+              sessionStorage.setItem(authDraftKey(), JSON.stringify({
+                title: String(fd.get("title") ?? ""),
+                content: String(fd.get("content") ?? ""),
+                expectedVersion,
+              }));
+            } catch {
+              setSaving(false);
+              alert("임시 저장 공간을 사용할 수 없어 로그인 화면으로 이동하지 않았습니다. 작성 내용을 복사한 뒤 다시 시도하세요.");
+              return;
+            }
+            const callbackUrl = window.location.pathname + window.location.search;
+            window.location.assign(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+            return;
+          }
           if (result && "conflict" in result) {
             // 다른 사람이 먼저 저장함 — 최신 version으로 갱신하고 배너 표시.
             // 사용자가 다시 저장을 누르면 최신 위에 덮어쓴다(의도적 진행).

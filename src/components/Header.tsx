@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth, signIn, signOut } from "@/auth";
 import { SearchBox } from "@/components/SearchBox";
 
@@ -36,7 +37,14 @@ export async function Header() {
             <form
               action={async () => {
                 "use server";
-                await signOut();
+                // 명시적 로그아웃 뒤에는 Keycloak SSO 세션이 남아 있어도 자동 재로그인을 막는다.
+                (await cookies()).set("swk_manual_logout", "1", {
+                  httpOnly: true,
+                  sameSite: "lax",
+                  secure: process.env.NODE_ENV === "production",
+                  path: "/",
+                });
+                await signOut({ redirectTo: "/" });
               }}
             >
               <button className="userbar__link">로그아웃</button>
@@ -46,6 +54,7 @@ export async function Header() {
           <form
             action={async () => {
               "use server";
+              (await cookies()).delete("swk_manual_logout");
               await signIn("keycloak");
             }}
           >
