@@ -1120,3 +1120,18 @@ mark {
   .editor-footer .meta { flex: 1 1 11rem; }
   .wysiwyg .milkdown .ProseMirror { min-height: 12rem; }
 }
+
+.article-toc { max-width: 44rem; margin-block: 0 1.6rem; border-block: 1px solid var(--border); }
+.article-toc summary { cursor: pointer; padding-block: .7rem; font-weight: 650; color: var(--ink-2); }
+.article-toc summary span { margin-left: .3rem; color: var(--muted); font-size: .8rem; }
+.article-toc ul { margin: 0 0 .9rem; }
+.article-toc a { display: inline-block; padding-block: .25rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.article-toc a:hover { color: var(--link); text-decoration: underline; }
+.prose-wiki :is(h1,h2,h3,h4,h5,h6)[id] { scroll-margin-top: calc(var(--masthead-h) + 1rem); }
+.prose-wiki a.section-link { margin-inline-start: .35em; color: var(--muted); font-size: .8em; text-decoration: none; }
+.prose-wiki a.section-link:hover, .prose-wiki a.section-link:focus-visible { color: var(--link); }
+.prose-wiki .image-original { display: inline-block; max-width: 100%; cursor: zoom-in; }
+.copy-feedback { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 40;
+  width: max-content; max-width: 90vw; padding: .65rem 1rem; border-radius: var(--radius);
+  color: var(--primary-ink); background: var(--primary); box-shadow: var(--shadow); animation: dismiss-copy 3s forwards; }
+@keyframes dismiss-copy { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }

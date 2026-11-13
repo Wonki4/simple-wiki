@@ -4,7 +4,9 @@ import Link from "next/link";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
-import { getRenderedPageHtml } from "@/lib/page-render-cache";
+import { getBacklinks } from "@/lib/wiki-link-destinations";
+import { WikiArticle } from "@/components/WikiArticle";
+import { getRenderedPage } from "@/lib/page-render-cache";
 import { deletePage, movePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EditSourceBadge } from "@/components/EditSourceBadge";
@@ -54,7 +56,7 @@ export default async function PageView({
   const likeState = await getLikeState(page.id, session.userId);
   const comments = await listComments(page.id);
   const canModerate = hasRole(role, "admin");
-  const html = await getRenderedPageHtml({
+  const article = await getRenderedPage({
     pageId: page.id,
     version: page.version,
     content: page.content,
@@ -62,10 +64,7 @@ export default async function PageView({
     spaceKey,
   });
 
-  const backlinks = await prisma.pageLink.findMany({
-    where: { toSpaceId: space.id, toSlug: slug },
-    include: { fromPage: { select: { title: true, slug: true } } },
-  });
+  const backlinks = await getBacklinks(space.id, slug);
 
   // 이동 드롭다운: 자기 자신·자손 제외한 전체 문서(트리 순서·들여쓰기)
   const allPages = canEdit
@@ -132,7 +131,7 @@ export default async function PageView({
           <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
         </p>
       </header>
-      <article className="prose-wiki" dangerouslySetInnerHTML={{ __html: html }} />
+      <WikiArticle {...article} />
       <div className="document-reactions">
         <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>
@@ -142,9 +141,9 @@ export default async function PageView({
           <h2 className="eyebrow">이 페이지를 링크한 문서</h2>
           <ul className="mt-3 grid gap-1.5 text-sm">
             {backlinks.map((b) => (
-              <li key={b.id}>
-                <Link href={`/s/${spaceKey}/${encodeURIComponent(b.fromPage.slug)}`} className="title-link">
-                  {b.fromPage.title}
+              <li key={b.slug}>
+                <Link href={`/s/${spaceKey}/${encodeURIComponent(b.slug)}`} className="title-link">
+                  {b.title}
                 </Link>
               </li>
             ))}

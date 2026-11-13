@@ -5,7 +5,8 @@ import remarkRehype from "remark-rehype";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeShiki from "@shikijs/rehype";
 import rehypeStringify from "rehype-stringify";
-import { remarkWikiLinks } from "./wiki-links";
+import { readingMarkup, type Section } from "./reading-markup";
+import { type WikiLinkOptions, remarkWikiLinks } from "./wiki-links";
 
 // sanitize는 shiki보다 먼저 실행한다. shiki가 넣는 style 속성이 살아남도록.
 const schema = {
@@ -23,18 +24,15 @@ const schema = {
   },
 } as any;
 
-export interface RenderOptions {
-  spaceKey: string;
-  existingSlugs: Set<string>;
-}
-
-export async function renderMarkdown(markdown: string, opts: RenderOptions): Promise<string> {
+export async function renderMarkdown(markdown: string, opts: WikiLinkOptions) {
+  const sections: Section[] = [];
   const file = await unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkWikiLinks, opts)
     .use(remarkRehype)
     .use(rehypeSanitize, schema)
+    .use(readingMarkup, sections)
     .use(rehypeShiki, {
       // 라이트 색을 인라인 color로, 다크 색을 --shiki-dark CSS 변수로 내보낸다.
       // globals.css가 prefers-color-scheme: dark에서 --shiki-dark를 활성화한다.
@@ -44,5 +42,5 @@ export async function renderMarkdown(markdown: string, opts: RenderOptions): Pro
     })
     .use(rehypeStringify)
     .process(markdown);
-  return String(file);
+  return { html: String(file), sections };
 }

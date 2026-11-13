@@ -1,7 +1,6 @@
 import { unstable_cache, revalidateTag } from "next/cache";
-import { prisma } from "@/lib/db";
+import { getWikiDestinations, spaceLinksTag } from "./wiki-link-destinations";
 import { renderMarkdown } from "@/lib/markdown";
-import { extractWikiLinks } from "@/lib/wiki-links";
 
 export function pageCacheTag(pageId: string): string {
   return `page:${pageId}`;
@@ -14,30 +13,18 @@ export function pageCacheTag(pageId: string): string {
  * 생성/삭제)의 cross-page staleness 상한. 편집 replica는 revalidateTag로 즉시 무효화한다.
  * 권한 판정은 이 함수 밖에서 매 요청 수행한다(여기엔 권한 로직이 없다).
  */
-export function getRenderedPageHtml(args: {
+export function getRenderedPage(args: {
   pageId: string;
   version: number;
   content: string;
   spaceId: string;
   spaceKey: string;
-}): Promise<string> {
+}) {
   const { pageId, version, content, spaceId, spaceKey } = args;
   const cached = unstable_cache(
-    async () => {
-      const targets = extractWikiLinks(content).map((l) => l.slug);
-      const existing = targets.length
-        ? await prisma.page.findMany({
-            where: { spaceId, slug: { in: targets } },
-            select: { slug: true },
-          })
-        : [];
-      return renderMarkdown(content, {
-        spaceKey,
-        existingSlugs: new Set(existing.map((p) => p.slug)),
-      });
-    },
-    ["page-html", pageId, String(version)],
-    { tags: [pageCacheTag(pageId)], revalidate: 60 },
+    async () => renderMarkdown(content, { spaceKey, destinations: await getWikiDestinations(spaceId) }),
+    ["page-reading-v1", pageId, String(version)],
+    { tags: [pageCacheTag(pageId), spaceLinksTag(spaceId)], revalidate: 60 },
   );
   return cached();
 }

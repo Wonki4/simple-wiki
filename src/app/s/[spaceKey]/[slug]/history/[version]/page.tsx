@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
-import { renderMarkdown } from "@/lib/markdown";
+import { getRenderedPage } from "@/lib/page-render-cache";
+import { WikiArticle } from "@/components/WikiArticle";
 import { restoreRevision } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
@@ -29,7 +30,7 @@ export default async function RevisionPage({
 
   const latest = await prisma.pageRevision.aggregate({ where: { pageId: page.id }, _max: { version: true } });
   const isLatest = latest._max.version === version;
-  const html = await renderMarkdown(rev.content, { spaceKey, existingSlugs: new Set() });
+  const article = await getRenderedPage({ pageId: page.id, version, spaceId: space.id, spaceKey, content: rev.content });
 
   return (
     <main className="py-10">
@@ -53,7 +54,7 @@ export default async function RevisionPage({
           )}
         </div>
       </div>
-      <article className="prose-wiki mt-7" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="mt-7"><WikiArticle {...article} /></div>
     </main>
   );
 }

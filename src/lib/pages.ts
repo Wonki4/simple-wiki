@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
+import { invalidateWikiNames } from "@/lib/wiki-link-destinations";
 import { invalidatePageCache } from "@/lib/page-render-cache";
 import { selfAndDescendantIds } from "@/lib/page-tree";
 import {
@@ -27,7 +28,7 @@ async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: 
 // 경합(같은 다음 version을 동시에 쓰는 경우)은 (pageId, version) 유니크 위반으로 감지해
 // PageConflictError로 번역한다. 반환값은 새로 만들어진 버전 번호.
 async function commitRevision(input: {
-  page: { id: string; version: number; spaceId: string };
+  page: { id: string; version: number; spaceId: string; title: string };
   title: string;
   content: string;
   authorId: string;
@@ -89,6 +90,7 @@ async function commitRevision(input: {
     throw e;
   }
   invalidatePageCache(input.page.id);
+  if (input.title !== input.page.title) invalidateWikiNames(input.page.spaceId);
   return nextV;
 }
 
@@ -146,6 +148,7 @@ export async function createPageInSpace(
     return true;
   });
 
+  if (created) invalidateWikiNames(input.spaceId);
   return { slug, created };
 }
 
@@ -168,7 +171,7 @@ export async function updatePageInSpace(
   assertExpectedVersion(page.version, input.expectedVersion);
 
   const version = await commitRevision({
-    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    page,
     title,
     content: input.content,
     authorId: input.authorId,
@@ -206,7 +209,7 @@ export async function editPageContent(
   const newContent = transform(page.content); // 위반 시 여기서 throw
 
   const version = await commitRevision({
-    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    page,
     title: page.title,
     content: newContent,
     authorId: input.authorId,
@@ -257,7 +260,7 @@ export async function revertPage(input: {
   if (!rev) return { found: true, missingRevision: true };
 
   const version = await commitRevision({
-    page: { id: page.id, version: page.version, spaceId: input.spaceId },
+    page,
     title: rev.title,
     content: rev.content,
     authorId: input.authorId,
@@ -282,6 +285,7 @@ export async function deletePageInSpace(input: { spaceId: string; slug: string }
     prisma.page.delete({ where: { id: page.id } }),
   ]);
   invalidatePageCache(page.id);
+  invalidateWikiNames(input.spaceId);
   return { found: true };
 }
 
