@@ -30,13 +30,13 @@ export async function getWikiDestinations(spaceId: string) {
   const entries = await unstable_cache(async () => {
     // DB에서 제목만 중복 제거한다. 배포 전의 이름 변경도 별도 이관 없이 해석한다.
     const names = await prisma.$queryRaw<{ name: string; slug: string; priority: number }[]>`
-      SELECT slug AS name, slug, 0 AS priority FROM "Page" WHERE "spaceId" = ${spaceId}
+      SELECT slug AS name, slug, 0 AS priority FROM "Page" WHERE "deletedAt" IS NULL AND "spaceId" = ${spaceId}
       UNION ALL
-      SELECT title, slug, 1 FROM "Page" WHERE "spaceId" = ${spaceId}
+      SELECT title, slug, 1 FROM "Page" WHERE "deletedAt" IS NULL AND "spaceId" = ${spaceId}
       UNION ALL
       SELECT DISTINCT r.title, p.slug, 2 FROM "PageRevision" r
       JOIN "Page" p ON r."pageId" = p.id
-      WHERE p."spaceId" = ${spaceId} AND r.title <> p.title
+      WHERE p."deletedAt" IS NULL AND p."spaceId" = ${spaceId} AND r.title <> p.title
     `;
     return [...resolveWikiNames(names)];
   }, ["wiki-destinations-v1", spaceId], { tags: [spaceLinksTag(spaceId)], revalidate: 60 })();
@@ -47,7 +47,7 @@ export async function getBacklinks(spaceId: string, slug: string) {
   const destinations = await getWikiDestinations(spaceId);
   const keys = [...destinations].filter(([, target]) => target === slug).map(([key]) => key);
   const candidates = await prisma.page.findMany({
-    where: { spaceId, linksFrom: { some: { toSpaceId: spaceId, toSlug: { in: keys } } } },
+    where: { spaceId, deletedAt: null, linksFrom: { some: { toSpaceId: spaceId, toSlug: { in: keys } } } },
     select: { slug: true, title: true, content: true },
     orderBy: { title: "asc" },
   });

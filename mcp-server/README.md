@@ -18,7 +18,9 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 | `get_page` | 페이지 마크다운 원문 | viewer |
 | `create_page` | 새 페이지 생성 | editor |
 | `update_page` | 페이지 수정(새 리비전) | editor |
-| `delete_page` | 페이지 삭제 | editor |
+| `delete_page` | 문서를 휴지통으로 이동 | editor |
+| `list_trashed_pages` | 스페이스 휴지통 목록 | editor |
+| `restore_trashed_page` | 휴지통 문서를 ID로 복원 | editor |
 
 권한은 토큰을 발급한 사용자의 스페이스 권한을 그대로 따릅니다. 읽을 수 없는 스페이스는
 목록·조회 모두 404로 숨겨집니다.
