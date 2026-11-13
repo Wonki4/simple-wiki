@@ -36,6 +36,7 @@ test("저장 시 세션이 만료되어도 재로그인 후 작성 중인 초안
 
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page).toHaveURL(/\/s\/notice\/new$/);
+  await expect(page.getByRole("status").filter({ hasText: "초안을 복원" })).toBeVisible();
   await expect(page.getByPlaceholder("제목")).toHaveValue("재로그인 초안 테스트");
   await expect(page.locator(".milkdown .ProseMirror")).toContainText("재로그인 뒤에도 남아 있어야 할 내용");
 });

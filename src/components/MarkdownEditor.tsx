@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
+import { configureWikiLinkMarkdown } from "@/lib/editor-markdown";
+import { readDraft, storeDraft, type PageDraft } from "@/lib/editor-draft";
+import type { SaveResult } from "@/actions/pages";
 import { WikiIcon } from "./WikiIcon";
 import { useEffect, useRef, useState } from "react";
 import type { Crepe as CrepeType } from "@milkdown/crepe";
@@ -8,86 +13,63 @@ import { insert } from "@milkdown/kit/utils";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 
-type SaveResult = { conflict: true; currentVersion: number } | { authRequired: true } | void;
-
-const authDraftKey = () => `simple-wiki:auth-draft:${window.location.pathname}${window.location.search}`;
-
 interface Props {
+  draftKey: string;
   spaceKey: string;
   spaceName: string;
   cancelHref: string;
   initialTitle: string;
   initialContent: string;
   expectedVersion?: number;
-  onSave: (formData: FormData) => Promise<SaveResult>;
+  onSave: (draft: PageDraft) => Promise<SaveResult>;
 }
 
-// 마크다운 직렬화 시 리터럴 대괄호가 이스케이프(\[)될 수 있다.
-// 위키링크 [[페이지명]]이 깨지지 않도록 되돌린다.
-function cleanMarkdown(md: string): string {
-  return md.replace(/\\\[/g, "[").replace(/\\\]/g, "]");
-}
-
-// Next.js의 redirect()/notFound()는 제어 흐름을 위해 특수 에러를 throw한다.
-// 저장 성공 후 redirect가 이 에러를 던지는데, 이를 catch로 삼키면 실제로는 성공인데도
-// "저장 실패" 알림이 뜬다. 이 에러는 다시 던져 프레임워크가 이동을 처리하게 한다.
-function isRouterControlFlowError(e: unknown): boolean {
-  if (typeof e !== "object" || e === null || !("digest" in e)) return false;
-  const digest = (e as { digest: unknown }).digest;
-  return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND");
-}
-
-export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, initialContent, expectedVersion: initialExpectedVersion, onSave }: Props) {
+export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, initialTitle, initialContent, expectedVersion, onSave }: Props) {
+  const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
-  const [content, setContent] = useState(initialContent);
+  const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [expectedVersion, setExpectedVersion] = useState(initialExpectedVersion);
-  const [conflict, setConflict] = useState(false);
+  const [error, setError] = useState("");
+  const [conflictVersion, setConflictVersion] = useState<number>();
+  const [restored, setRestored] = useState(false);
+  const [storageFailed, setStorageFailed] = useState(false);
   const holderRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<CrepeType | null>(null);
-  const restoredDraftRef = useRef<{ title: string; content: string; expectedVersion?: number } | null>(null);
+  const draftRef = useRef<PageDraft>({ title: initialTitle, content: initialContent, expectedVersion });
+  const readContentRef = useRef<(() => string) | null>(null);
+  const discardedRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    let crepe: CrepeType | null = null;
-    let destroyed = false;
-    let startingContent = initialContent;
+  function persistDraft() {
+    if (discardedRef.current) return;
+    const draft = draftRef.current;
+    if (readContentRef.current) draft.content = readContentRef.current();
+    const changed = draft.title !== initialTitle || draft.content !== initialContent;
+    setStorageFailed(!storeDraft(draftKey, changed ? draft : null));
+  }
 
-    // 저장 도중 세션이 만료되어 로그인 왕복이 발생한 경우에만 임시 보관한 초안을 복원한다.
-    try {
-      if (!restoredDraftRef.current) {
-        const key = authDraftKey();
-        const raw = sessionStorage.getItem(key);
-        if (raw) {
-          sessionStorage.removeItem(key);
-          const draft = JSON.parse(raw) as { title?: unknown; content?: unknown; expectedVersion?: unknown };
-          if (typeof draft.title === "string" && typeof draft.content === "string") {
-            restoredDraftRef.current = {
-              title: draft.title,
-              content: draft.content,
-              expectedVersion: typeof draft.expectedVersion === "number" ? draft.expectedVersion : undefined,
-            };
-          }
-        }
-      }
-      if (restoredDraftRef.current) {
-        setTitle(restoredDraftRef.current.title);
-        setContent(restoredDraftRef.current.content);
-        startingContent = restoredDraftRef.current.content;
-        if (restoredDraftRef.current.expectedVersion !== undefined) {
-          setExpectedVersion(restoredDraftRef.current.expectedVersion);
-        }
-      }
-    } catch {
-      // 스토리지 차단이나 손상된 초안은 일반 편집 화면을 막지 않는다.
+  function discardDraft() {
+    discardedRef.current = true;
+    storeDraft(draftKey, null);
+  }
+
+  useEffect(() => {
+    let destroyed = false;
+    const stored = readDraft(draftKey);
+    if (stored) {
+      draftRef.current = stored;
+      setTitle(stored.title);
+      setRestored(true);
     }
+    const startingContent = draftRef.current.content;
+    window.addEventListener("pagehide", persistDraft);
 
     (async () => {
       const { Crepe } = await import("@milkdown/crepe");
       if (destroyed || !holderRef.current) return;
 
-      crepe = new Crepe({
+      const crepe = new Crepe({
         root: holderRef.current,
         defaultValue: startingContent,
         features: {
@@ -115,25 +97,40 @@ export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, 
         },
       });
 
+      crepe.editor.config(configureWikiLinkMarkdown);
       await crepe.create();
       if (destroyed) {
         crepe.destroy();
         return;
       }
-      crepe.on((api) => {
-        api.markdownUpdated((_ctx, markdown) => {
-          setContent(cleanMarkdown(markdown));
-        });
+
+      const editor = crepe.editor;
+      const openingDoc = editor.action(ctx => ctx.get(editorViewCtx).state.doc);
+      // 제목만 변경하거나 본문 편집을 되돌렸다면 공백·개행까지 원문 그대로 저장한다.
+      let lastDoc = openingDoc;
+      let lastSource = startingContent;
+      readContentRef.current = () => editor.action(ctx => {
+        const doc = ctx.get(editorViewCtx).state.doc;
+        if (doc !== lastDoc) {
+          lastSource = doc.eq(openingDoc) ? startingContent : ctx.get(serializerCtx)(doc);
+          lastDoc = doc;
+        }
+        return lastSource;
       });
+      crepe.on(api => api.updated(persistDraft));
       crepeRef.current = crepe;
+      setReady(true);
     })();
 
     return () => {
       destroyed = true;
-      crepe?.destroy();
+      window.removeEventListener("pagehide", persistDraft);
+      persistDraft();
+      readContentRef.current = null;
+      crepeRef.current?.destroy();
       crepeRef.current = null;
     };
-    // 마운트 시 한 번만 생성한다.
+    // 문서 또는 새 문서의 대상이 바뀌면 부모가 draftKey로 다시 마운트한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -176,59 +173,65 @@ export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, 
 
   return (
     <form
-      action={async (fd) => {
-        // 제출 시점의 최신 마크다운을 확실히 반영한다.
-        if (crepeRef.current) fd.set("content", cleanMarkdown(crepeRef.current.getMarkdown()));
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const editor = crepeRef.current;
+        if (!editor || saving || uploading) return;
         setSaving(true);
+        editor.setReadonly(true);
+        setError("");
+        persistDraft();
+        const draft = { ...draftRef.current };
         try {
-          const result = await onSave(fd);
-          if (result && "authRequired" in result) {
-            try {
-              sessionStorage.setItem(authDraftKey(), JSON.stringify({
-                title: String(fd.get("title") ?? ""),
-                content: String(fd.get("content") ?? ""),
-                expectedVersion,
-              }));
-            } catch {
-              setSaving(false);
-              alert("임시 저장 공간을 사용할 수 없어 로그인 화면으로 이동하지 않았습니다. 작성 내용을 복사한 뒤 다시 시도하세요.");
+          const result = await onSave({ ...draft, expectedVersion: conflictVersion ?? draft.expectedVersion });
+          if ("savedHref" in result) {
+            discardDraft();
+            router.push(result.savedHref);
+            return;
+          }
+          if ("authRequired" in result) {
+            if (storeDraft(draftKey, draft)) {
+              const callbackUrl = window.location.pathname + window.location.search;
+              window.location.assign(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
               return;
             }
-            const callbackUrl = window.location.pathname + window.location.search;
-            window.location.assign(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-            return;
+            setError("임시 저장 공간을 사용할 수 없습니다. 작성 내용을 복사한 뒤 다시 로그인하세요.");
+          } else if ("conflict" in result) {
+            setConflictVersion(result.currentVersion);
+          } else {
+            setError(result.error);
           }
-          if (result && "conflict" in result) {
-            // 다른 사람이 먼저 저장함 — 최신 version으로 갱신하고 배너 표시.
-            // 사용자가 다시 저장을 누르면 최신 위에 덮어쓴다(의도적 진행).
-            setExpectedVersion(result.currentVersion);
-            setConflict(true);
-            setSaving(false);
-            return;
-          }
-        } catch (e) {
-          // redirect()/notFound()의 제어 흐름 에러는 성공 신호다. 알림 없이 넘겨서
-          // 서버 주도 이동이 진행되게 한다(다시 throw하면 이동이 취소됨).
-          if (isRouterControlFlowError(e)) return;
-          setSaving(false);
-          alert("저장에 실패했습니다. 잠시 후 다시 시도하세요.");
+        } catch {
+          setError("저장에 실패했습니다. 잠시 후 다시 시도하세요.");
         }
+        crepeRef.current?.setReadonly(false);
+        setSaving(false);
       }}
     >
       <div className="document-toolbar editor-toolbar">
-        <div className="document-path"><WikiIcon name="book" /><span>{spaceName}</span><span className="path-divider">/</span><strong>{initialExpectedVersion === undefined ? "새 문서" : "편집"}</strong></div>
+        <div className="document-path"><WikiIcon name="book" /><span>{spaceName}</span><span className="path-divider">/</span><strong>{expectedVersion === undefined ? "새 문서" : "편집"}</strong></div>
         <div className="document-actions">
-          <Link href={cancelHref} className="cancel-link">취소</Link>
-          <button disabled={saving || uploading} className="btn btn-primary">{saving ? "저장 중…" : "저장"}</button>
+          <Link
+            href={cancelHref}
+            className="cancel-link"
+            onNavigate={(event) => {
+              if (saving) event.preventDefault();
+              else discardDraft();
+            }}
+          >취소</Link>
+          <button disabled={!ready || saving || uploading} className="btn btn-primary">{saving ? "저장 중…" : "저장"}</button>
         </div>
       </div>
-      {conflict && (
+      {error && <div className="notice notice-warn" role="alert">{error}</div>}
+      {storageFailed && <div className="notice notice-warn" role="alert">초안을 이 탭에 보관할 수 없습니다. 이동하기 전에 내용을 복사하세요.</div>}
+      {restored && <p className="meta" role="status">이 탭에 보관한 초안을 복원했습니다.</p>}
+      {conflictVersion !== undefined && (
         <div className="notice notice-warn" role="alert">
-          다른 사람이 이 페이지를 먼저 수정했습니다(현재 v{expectedVersion}).{" "}
+          다른 사람이 이 페이지를 먼저 수정했습니다(현재 v{conflictVersion}).{" "}
           <button
             type="button"
             className="linklike"
-            onClick={() => window.location.reload()}
+            onClick={() => { discardDraft(); window.location.reload(); }}
           >
             최신 내용 불러오기
           </button>
@@ -243,7 +246,13 @@ export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, 
           rows={1}
           required
           value={title}
-          onChange={(event) => setTitle(event.target.value.replace(/[\r\n]+/g, " "))}
+          disabled={saving || !ready}
+          onChange={(event) => {
+            const value = event.target.value.replace(/[\r\n]+/g, " ");
+            draftRef.current.title = value;
+            setTitle(value);
+            persistDraft();
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -253,8 +262,6 @@ export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, 
           className="document-title editor-title"
         />
       </div>
-      <input type="hidden" name="content" value={content} />
-      <input type="hidden" name="expectedVersion" value={expectedVersion ?? ""} />
       <div className="wysiwyg">
         <div ref={holderRef} />
       </div>
@@ -262,7 +269,7 @@ export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, 
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          disabled={uploading}
+          disabled={!ready || saving || uploading}
           onClick={() => fileInputRef.current?.click()}
         >
           <WikiIcon name="attach" />{uploading ? "올리는 중…" : "파일 첨부"}

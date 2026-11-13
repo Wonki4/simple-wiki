@@ -7,15 +7,18 @@ import { MarkdownEditor } from "@/components/MarkdownEditor";
 export default async function EditPagePage({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
   const { spaceKey, slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const { space } = await requireSpaceRole(spaceKey, "editor");
+  const { space, session } = await requireSpaceRole(spaceKey, "editor");
   const page = await prisma.page.findUnique({
     where: { spaceId_slug: { spaceId: space.id, slug } },
-    select: { title: true, content: true, version: true },
+    select: { id: true, title: true, content: true, version: true },
   });
   if (!page) notFound();
+  const draftKey = `simple-wiki:draft:${JSON.stringify([session.userId, space.id, "edit", page.id])}`;
   return (
     <main className="document" aria-label="문서 편집">
       <MarkdownEditor
+        key={draftKey}
+        draftKey={draftKey}
         spaceKey={spaceKey}
         spaceName={space.name}
         cancelHref={`/s/${spaceKey}/${encodeURIComponent(slug)}`}
