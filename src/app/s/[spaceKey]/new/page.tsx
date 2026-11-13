@@ -17,7 +17,7 @@ export default async function NewPagePage({
   // 부모 문서 확인 — 없으면(잘못된 링크 등) 최상위 생성으로 조용히 폴백하지 않고 안내만 남긴다.
   const parentPage = parent
     ? await prisma.page.findUnique({
-        where: { spaceId_slug: { spaceId: space.id, slug: parent } },
+        where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug: parent } },
         select: { slug: true, title: true },
       })
     : null;

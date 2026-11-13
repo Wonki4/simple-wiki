@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireApiSpaceRole } from "@/lib/api-auth";
+import { getSpaceTree } from "@/lib/space-tree";
 import { prisma } from "@/lib/db";
 import { createPageInSpace } from "@/lib/pages";
 
@@ -9,18 +10,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ spaceKey: s
   const auth = await requireApiSpaceRole(req, spaceKey, "viewer");
   if (!auth.ok) return auth.response;
 
-  const pages = await prisma.page.findMany({
-    where: { spaceId: auth.space.id },
-    orderBy: { title: "asc" },
-    select: { slug: true, title: true, updatedAt: true, parent: { select: { slug: true } } },
-  });
+  const pages = await getSpaceTree(auth.space.id);
+  const parentSlugs = new Map(pages.map(page => [page.id, page.slug]));
   return Response.json({
     space: { key: auth.space.key, name: auth.space.name },
     pages: pages.map((p) => ({
       slug: p.slug,
       title: p.title,
       updatedAt: p.updatedAt,
-      parentSlug: p.parent?.slug ?? null,
+      parentSlug: p.parentId ? parentSlugs.get(p.parentId) ?? null : null,
     })),
   });
 }
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   let parentId: string | null = null;
   if (parentSlug) {
     const parent = await prisma.page.findUnique({
-      where: { spaceId_slug: { spaceId: auth.space.id, slug: parentSlug } },
+      where: { deletedAt: null, spaceId_slug: { spaceId: auth.space.id, slug: parentSlug } },
       select: { id: true },
     });
     if (!parent) {

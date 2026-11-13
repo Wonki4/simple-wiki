@@ -44,7 +44,7 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 규칙:
 - 권한은 토큰 소유자의 스페이스 권한을 따릅니다. 읽을 수 없는 스페이스는 목록·조회 모두 404로 숨겨집니다.
 - 문서 사이 링크는 위키링크 문법 [[문서 제목]]을 씁니다.
-- delete_page는 되돌릴 수 없으니 사용자가 명시적으로 요청할 때만 사용합니다.`;
+- delete_page는 문서를 휴지통으로 옮기므로 사용자가 명시적으로 요청할 때만 사용합니다.`;
 
 interface ApiResult {
   ok: boolean;
@@ -390,7 +390,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     "delete_page",
     {
       title: "페이지 삭제",
-      description: "페이지를 삭제합니다(editor 권한). 되돌릴 수 없습니다.",
+      description: "문서를 스페이스 휴지통으로 옮깁니다(editor 권한). 반환된 trashId로 복원할 수 있습니다.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
         slug: z.string().describe("삭제할 페이지 slug"),
@@ -402,6 +402,33 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
           method: "DELETE",
         }),
       ),
+  );
+
+  server.registerTool(
+    "list_trashed_pages",
+    {
+      title: "문서 휴지통",
+      description: "스페이스 휴지통에서 복원할 문서 id, 원래 주소, 삭제자와 시간을 조회합니다(editor 권한).",
+      inputSchema: { space: z.string().describe("스페이스 키") },
+    },
+    async ({ space }) => toResult(await api(`/api/spaces/${encodeURIComponent(space)}/trash`)),
+  );
+
+  server.registerTool(
+    "restore_trashed_page",
+    {
+      title: "휴지통 문서 복원",
+      description: "삭제된 문서를 이력과 함께 복원합니다(editor 권한). 원래 주소가 사용 중이면 다른 slug로 재시도할 수 있습니다.",
+      inputSchema: {
+        space: z.string().describe("스페이스 키"),
+        id: z.string().describe("휴지통 문서 id"),
+        slug: z.string().optional().describe("원래 주소 대신 사용할 주소"),
+      },
+    },
+    async ({ space, id, slug }) => toResult(await api(
+      `/api/spaces/${encodeURIComponent(space)}/trash/${encodeURIComponent(id)}/restore${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`,
+      { method: "POST" },
+    )),
   );
 
   server.registerTool(

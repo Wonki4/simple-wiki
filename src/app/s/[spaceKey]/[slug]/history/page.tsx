@@ -2,17 +2,37 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
+import { RevisionComparison } from "@/components/RevisionComparison";
 import { EditSourceBadge } from "@/components/EditSourceBadge";
 
-export default async function HistoryPage({ params }: { params: Promise<{ spaceKey: string; slug: string }> }) {
+export default async function HistoryPage({ params, searchParams }: {
+  params: Promise<{ spaceKey: string; slug: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
   const { spaceKey, slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
   const { space } = await requireSpaceRole(spaceKey, "viewer");
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
-    include: { revisions: { orderBy: { version: "desc" } } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
+    select: { id: true, title: true, revisions: {
+      orderBy: { version: "desc" },
+      select: { id: true, version: true, title: true, authorId: true, createdAt: true, source: true, viaLabel: true },
+    } },
   });
   if (!page) notFound();
+
+  const query = await searchParams;
+  const comparing = query.from !== undefined || query.to !== undefined;
+  const from = Number(query.from);
+  const to = Number(query.to);
+  const selected = comparing && [from, to].every(v => page.revisions.some(r => r.version === v))
+    ? await prisma.pageRevision.findMany({
+        where: { pageId: page.id, version: { in: [from, to] } },
+        select: { version: true, title: true, content: true },
+      })
+    : [];
+  const before = selected.find(r => r.version === from);
+  const after = selected.find(r => r.version === to);
 
   const authorIds = [...new Set(page.revisions.map((r) => r.authorId))];
   const authors = await prisma.user.findMany({
@@ -28,6 +48,19 @@ export default async function HistoryPage({ params }: { params: Promise<{ spaceK
         ← {page.title}
       </Link>
       <h1 className="page-title mt-1.5">변경 이력</h1>
+      {page.revisions.length > 1 && (
+        <form method="get" className="diff-picker">
+          <label>기준 버전 <select name="from" defaultValue={before?.version ?? page.revisions[1].version}>
+            {page.revisions.map(r => <option key={r.version} value={r.version}>v{r.version}</option>)}
+          </select></label>
+          <label>비교 버전 <select name="to" defaultValue={after?.version ?? page.revisions[0].version}>
+            {page.revisions.map(r => <option key={r.version} value={r.version}>v{r.version}</option>)}
+          </select></label>
+          <button className="btn btn-primary btn-sm">버전 비교</button>
+        </form>
+      )}
+      {comparing && (before && after ? <RevisionComparison from={before} to={after} />
+        : <p className="notice notice-warn" role="alert">이 문서에 있는 두 버전을 선택하세요.</p>)}
       <ul className="mt-6">
         {page.revisions.map((r) => (
           <li key={r.id} className="row">
