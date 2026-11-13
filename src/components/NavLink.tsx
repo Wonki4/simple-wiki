@@ -17,7 +17,7 @@ export function NavLink({ href, prefix, children }: Props) {
     <Link
       href={href}
       className={`lnb__item${active ? " lnb__item--active" : ""}`}
-      aria-current={active ? "page" : undefined}
+      aria-current={pathname === href ? "page" : active ? "location" : undefined}
     >
       {children}
     </Link>

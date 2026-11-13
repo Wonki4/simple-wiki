@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { WikiIcon } from "./WikiIcon";
 import { useEffect, useRef, useState } from "react";
 import type { Crepe as CrepeType } from "@milkdown/crepe";
 import { insert } from "@milkdown/kit/utils";
@@ -12,6 +14,8 @@ const authDraftKey = () => `simple-wiki:auth-draft:${window.location.pathname}${
 
 interface Props {
   spaceKey: string;
+  spaceName: string;
+  cancelHref: string;
   initialTitle: string;
   initialContent: string;
   expectedVersion?: number;
@@ -33,7 +37,7 @@ function isRouterControlFlowError(e: unknown): boolean {
   return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND");
 }
 
-export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expectedVersion: initialExpectedVersion, onSave }: Props) {
+export function MarkdownEditor({ spaceKey, spaceName, cancelHref, initialTitle, initialContent, expectedVersion: initialExpectedVersion, onSave }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
@@ -92,7 +96,7 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         },
         featureConfigs: {
           [Crepe.Feature.Placeholder]: {
-            text: "여기에 입력하세요.  '/' 로 블록 삽입",
+            text: "본문을 입력하세요. / 키로 블록을 추가할 수 있습니다.",
             mode: "block",
           },
           [Crepe.Feature.ImageBlock]: {
@@ -211,6 +215,13 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
         }
       }}
     >
+      <div className="document-toolbar editor-toolbar">
+        <div className="document-path"><WikiIcon name="book" /><span>{spaceName}</span><span className="path-divider">/</span><strong>{initialExpectedVersion === undefined ? "새 문서" : "편집"}</strong></div>
+        <div className="document-actions">
+          <Link href={cancelHref} className="cancel-link">취소</Link>
+          <button disabled={saving || uploading} className="btn btn-primary">{saving ? "저장 중…" : "저장"}</button>
+        </div>
+      </div>
       {conflict && (
         <div className="notice notice-warn" role="alert">
           다른 사람이 이 페이지를 먼저 수정했습니다(현재 v{expectedVersion}).{" "}
@@ -224,37 +235,43 @@ export function MarkdownEditor({ spaceKey, initialTitle, initialContent, expecte
           . 그대로 다시 저장하면 상대의 수정 위에 덮어씁니다.
         </div>
       )}
-      <input
-        name="title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        required
-        placeholder="제목"
-        className="input input-title"
-      />
+      <div className="document-heading">
+        <textarea
+          name="title"
+          aria-label="제목"
+          placeholder="제목"
+          rows={1}
+          required
+          value={title}
+          onChange={(event) => setTitle(event.target.value.replace(/[\r\n]+/g, " "))}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              holderRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
+            }
+          }}
+          className="document-title editor-title"
+        />
+      </div>
       <input type="hidden" name="content" value={content} />
       <input type="hidden" name="expectedVersion" value={expectedVersion ?? ""} />
-      <div className="wysiwyg mt-4">
+      <div className="wysiwyg">
         <div ref={holderRef} />
       </div>
-      <div className="mt-2.5 flex items-center gap-3">
+      <div className="editor-footer">
         <button
           type="button"
-          className="btn btn-sm"
+          className="btn btn-ghost btn-sm"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
-          {uploading ? "올리는 중..." : "파일 첨부"}
+          <WikiIcon name="attach" />{uploading ? "올리는 중…" : "파일 첨부"}
         </button>
         <p className="meta">
-          이미지는 붙여넣기/드래그로, 일반 파일은 &apos;파일 첨부&apos; 버튼으로 올릴 수 있습니다. [[페이지명]]으로
-          위키링크를 만들 수 있습니다.
+          이미지는 끌어다 놓고, 문서는 [[제목]]으로 연결하세요.
         </p>
       </div>
       <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => attachFiles(e.target.files)} />
-      <button disabled={saving || uploading} className="btn btn-primary mt-4">
-        {saving ? "저장 중..." : "저장"}
-      </button>
     </form>
   );
 }

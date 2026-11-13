@@ -23,9 +23,7 @@ export default async function NewPagePage({
     : null;
 
   return (
-    <main className="py-10">
-      <p className="eyebrow">{spaceKey} · new page</p>
-      <h1 className="page-title mb-5 mt-1">새 페이지</h1>
+    <main className="document" aria-label="새 문서">
       {error && (
         <div className="notice notice-warn mb-4" role="alert">
           {error}
@@ -36,6 +34,8 @@ export default async function NewPagePage({
       )}
       <MarkdownEditor
         spaceKey={spaceKey}
+        spaceName={space.name}
+        cancelHref={parentPage ? `/s/${spaceKey}/${encodeURIComponent(parentPage.slug)}` : `/s/${spaceKey}`}
         initialTitle={title ?? ""}
         initialContent=""
         onSave={createPage.bind(null, spaceKey, parentPage?.slug ?? null)}

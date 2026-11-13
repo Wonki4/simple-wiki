@@ -1,3 +1,5 @@
+import { Disclosure } from "./Disclosure";
+import { WikiIcon } from "./WikiIcon";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { auth, signIn, signOut } from "@/auth";
@@ -8,13 +10,9 @@ export async function Header() {
   return (
     <header className="masthead">
       <div className="masthead__inner">
+        <button type="button" className="nav-trigger icon-button" popoverTarget="wiki-navigation" aria-label="위키 탐색 열기"><WikiIcon name="menu" /></button>
         <Link href="/" className="brand" aria-label="simple wiki 홈">
-          <svg className="brand__badge" viewBox="0 0 24 24" aria-hidden="true">
-            <rect width="24" height="24" rx="6" fill="currentColor" />
-            <rect x="6.5" y="7" width="11" height="2" rx="1" fill="#fff" />
-            <rect x="6.5" y="11" width="11" height="2" rx="1" fill="#fff" />
-            <rect x="6.5" y="15" width="7" height="2" rx="1" fill="#fff" />
-          </svg>
+          <span className="brand__badge"><WikiIcon name="book" /></span>
           <span className="brand__word">
             <span className="brand__word-1">simple</span>
             <span className="brand__word-2">wiki</span>
@@ -22,7 +20,7 @@ export async function Header() {
         </Link>
         <SearchBox />
         {session?.user ? (
-          <div className="userbar">
+          <Disclosure label="계정 메뉴" trigger={<WikiIcon name="account" />} className="account-menu">
             <Link href="/me" className="userbar__name" title="마이페이지">
               {session.user.name}
             </Link>
@@ -49,7 +47,7 @@ export async function Header() {
             >
               <button className="userbar__link">로그아웃</button>
             </form>
-          </div>
+          </Disclosure>
         ) : (
           <form
             action={async () => {

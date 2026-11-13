@@ -15,6 +15,7 @@ test("세션 만료 시 Keycloak SSO로 원래 페이지에 돌아오고, 로그
   await expect(page).toHaveURL(/\/s\/notice$/);
   await expect(page.getByRole("heading", { name: "공지사항" })).toBeVisible();
 
+  await page.getByRole("button", { name: "계정 메뉴" }).click();
   await page.getByRole("button", { name: "로그아웃" }).click();
   await expect(page).toHaveURL("http://localhost:3000/");
   await page.goto("/s/notice");
