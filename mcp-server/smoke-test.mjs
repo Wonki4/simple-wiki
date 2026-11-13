@@ -39,6 +39,12 @@ const created = await call("create_page", {
 });
 console.log("\n[create_page] isError=%s\n%s", created.isError, created.text);
 const slug = JSON.parse(created.text).slug;
+const search = await call("search_pages", { query: "MCP 테스트 문서", space: "eng", page: 1 });
+assert.ok(!search.isError);
+const found = JSON.parse(search.text);
+assert.equal(found.page, 1);
+assert.equal(found.pageSize, 50);
+assert.ok(found.results.some(r => r.slug === slug && r.spaceKey === "eng"));
 
 const got = await call("get_page", { space: "eng", slug });
 console.log("\n[get_page %s] isError=%s\n%s", slug, got.isError, got.text.slice(0, 180));

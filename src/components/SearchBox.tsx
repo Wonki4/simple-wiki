@@ -7,7 +7,9 @@ export function SearchBox() {
   const pathname = usePathname();
   const params = useSearchParams();
   const query = pathname === "/search" ? params.get("q") ?? "" : "";
-  const spaceKey = pathname.match(/^\/s\/([^/]+)/)?.[1] ?? (pathname === "/search" ? params.get("from") : null);
+  const inSpace = pathname.match(/^\/s\/([^/]+)/)?.[1];
+  const scope = inSpace ?? (pathname === "/search" ? params.get("space") : null);
+  const origin = inSpace ?? (pathname === "/search" ? params.get("from") : null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [keyLabel, setKeyLabel] = useState("⌘K");
 
@@ -29,7 +31,8 @@ export function SearchBox() {
 
   return (
     <form action="/search" method="GET" className="search">
-      {spaceKey && <input type="hidden" name="from" value={spaceKey} />}
+      {origin && <input type="hidden" name="from" value={origin} />}
+      {scope && <input type="hidden" name="space" value={scope} />}
       <div className="search__box">
         <svg className="search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
@@ -41,7 +44,7 @@ export function SearchBox() {
           ref={inputRef}
           type="search"
           name="q"
-          placeholder="문서 검색"
+          placeholder={scope ? "이 스페이스에서 검색" : "문서 검색"}
           aria-label="문서 검색"
           className="search__field"
         />

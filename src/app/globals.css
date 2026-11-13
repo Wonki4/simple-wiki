@@ -1148,3 +1148,9 @@ mark {
 .diff-titles span { color: var(--muted); }
 .diff-add { background: color-mix(in srgb, #29a35a 14%, var(--surface)); }
 .diff-remove { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
+
+.search-scope, .search-pagination { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.search-scope { margin-bottom: 1.25rem; font-size: .9rem; }
+.search-scope select { max-width: 100%; min-width: 0; padding: .35rem; border: 1px solid var(--border-strong); border-radius: .4rem; color: var(--ink); background: var(--surface); }
+.search-pagination { justify-content: center; margin-top: 1.5rem; font-size: .9rem; color: var(--muted); }
+.search-pagination a { padding: .5rem .75rem; color: var(--link); }
