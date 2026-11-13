@@ -214,10 +214,19 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     {
       title: "위키 검색",
       description:
-        "제목·본문 전문 검색. 읽을 수 있는 스페이스만 검색되며, 결과마다 스페이스 키/slug/제목/스니펫을 반환합니다.",
-      inputSchema: { query: z.string().describe("검색어") },
+        "제목·본문 검색. space를 생략하면 읽을 수 있는 전체 스페이스를 검색합니다. 페이지당 50건이며 page, totalPages, total과 결과를 반환합니다.",
+      inputSchema: {
+        query: z.string().describe("검색어"),
+        space: z.string().optional().describe("검색할 스페이스 키"),
+        page: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().describe("1부터 시작하는 결과 페이지"),
+      },
     },
-    async ({ query }) => toResult(await api(`/api/search?q=${encodeURIComponent(query)}`)),
+    async ({ query, space, page }) => {
+      const params = new URLSearchParams({ q: query });
+      if (space) params.set("space", space);
+      if (page) params.set("page", String(page));
+      return toResult(await api(`/api/search?${params}`));
+    },
   );
 
   server.registerTool(
