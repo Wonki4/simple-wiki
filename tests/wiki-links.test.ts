@@ -24,7 +24,7 @@ describe("extractWikiLinks", () => {
 async function render(md: string, existingSlugs: Set<string>) {
   const file = await unified()
     .use(remarkParse)
-    .use(remarkWikiLinks, { spaceKey: "eng", existingSlugs })
+    .use(remarkWikiLinks, { spaceKey: "eng", destinations: new Map([...existingSlugs].map(slug => [slug, slug])) })
     .use(remarkRehype)
     .use(rehypeStringify)
     .process(md);
@@ -52,4 +52,9 @@ describe("remarkWikiLinks", () => {
     expect(html).toContain("앞 ");
     expect(html).toContain(" 뒤");
   });
+});
+
+it("인라인 코드, 코드 블록, 링크 안의 텍스트는 색인에서 제외한다", () => {
+  const links = extractWikiLinks("**[[실제]]**\n\n`[[코드]]`\n\n~~~md\n[[예시]]\n~~~\n\n[**[[링크]]**](/guide)");
+  expect(links.map(link => link.slug)).toEqual(["실제"]);
 });
