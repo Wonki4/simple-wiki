@@ -37,13 +37,14 @@ function TreeItem({
           <button
             type="button"
             aria-label={isCollapsed ? "펼치기" : "접기"}
+            aria-expanded={!isCollapsed}
             onClick={() => onToggle(node.id)}
             className="lnb__twisty"
           >
             {isCollapsed ? "▸" : "▾"}
           </button>
         )}
-        <NavLink href={`/s/${currentKey}/${encodeURIComponent(node.slug)}`}>
+        <NavLink href={`/s/${currentKey}/${encodeURIComponent(node.slug)}`} prefix>
           <span className="lnb__name">{node.title}</span>
         </NavLink>
       </div>
@@ -94,7 +95,7 @@ export function SidebarDocs({ currentKey, currentName, pages, canEdit, canManage
           {/* 필터 입력 중에는 플랫 매칭 목록, 비우면 트리 */}
           {query
             ? filtered.map((p) => (
-                <NavLink key={p.id} href={`/s/${currentKey}/${encodeURIComponent(p.slug)}`}>
+                <NavLink key={p.id} href={`/s/${currentKey}/${encodeURIComponent(p.slug)}`} prefix>
                   <span className="lnb__name">{p.title}</span>
                 </NavLink>
               ))

@@ -1,3 +1,5 @@
+import { Disclosure } from "@/components/Disclosure";
+import { WikiIcon } from "@/components/WikiIcon";
 import Link from "next/link";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
@@ -78,82 +80,62 @@ export default async function PageView({
     : [];
   const currentParent = allPages.find((p) => p.id === page.parentId);
   const currentParentSlug = currentParent?.slug ?? "";
-  const currentParentLabel = currentParent
-    ? currentParent.title.length > 20
-      ? `${currentParent.title.slice(0, 20)}…`
-      : currentParent.title
-    : "(최상위)";
+  const documentUrl = `/s/${spaceKey}/${encodeURIComponent(slug)}`;
 
   return (
-    <main className="py-10">
-      {error && (
-        <div className="notice notice-warn mb-4" role="alert">
-          {error}
-        </div>
-      )}
-      {/* 상단 줄: breadcrumb + 문서 액션 버튼. 제목 줄에서 분리해 제목이 눌리지 않게 한다. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <Link href={`/s/${spaceKey}`} className="crumb">
-          {space.key} / {space.name}
+    <main className="document">
+      {error && <div className="notice notice-warn" role="alert">{error}</div>}
+      <div className="document-toolbar">
+        <Link href={`/s/${spaceKey}`} className="document-path">
+          <WikiIcon name="book" /><span>{space.name}</span>
         </Link>
         {canEdit && (
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}
-              className="btn btn-ghost btn-sm"
-            >
-              하위 문서
-            </Link>
-            <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`} className="btn btn-ghost btn-sm">편집</Link>
-            <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">이력</Link>
-            <form action={deletePage.bind(null, spaceKey, slug)}>
-              <ConfirmSubmitButton message="이 페이지를 삭제할까요?" className="btn btn-danger btn-sm">
-                삭제
-              </ConfirmSubmitButton>
-            </form>
+          <div className="document-actions">
+            <Link href={`${documentUrl}/edit`} className="btn btn-ghost"><WikiIcon name="edit" />편집</Link>
+            <Disclosure label="문서 더보기" trigger={<WikiIcon name="more" />}>
+              <Link href={`${documentUrl}/history`}>이력</Link>
+              <Link href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}>하위 문서</Link>
+              <details className="move" data-parent={currentParentSlug}>
+                <summary className="menu-item" aria-label="이동할 위치">
+                  문서 이동 ▾
+                </summary>
+                <form action={movePage.bind(null, spaceKey, slug)} className="move__panel">
+                  <button name="parent" value="" className="move__item" disabled={!currentParent}>
+                    (최상위)
+                  </button>
+                  {moveTargets.map((t) => (
+                    <button
+                      key={t.id}
+                      name="parent"
+                      value={t.slug}
+                      className="move__item"
+                      style={{ paddingLeft: `${0.6 + t.depth * 0.9}rem` }}
+                      disabled={t.slug === currentParentSlug}
+                    >
+                      {t.title}
+                    </button>
+                  ))}
+                </form>
+              </details>
+              <form action={deletePage.bind(null, spaceKey, slug)}>
+                <ConfirmSubmitButton message="이 페이지를 삭제할까요?" className="menu-item danger-text">삭제</ConfirmSubmitButton>
+              </form>
+            </Disclosure>
           </div>
         )}
       </div>
 
-      {/* 제목 줄: 제목 + 위치(이동) 컨트롤만. 네이티브 select 팝업은 위치·크기를 제어할 수
-          없어(OS 렌더링) details 팝오버로 직접 그린다. 각 항목이 곧 submit 버튼이다. */}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="page-title min-w-0">{page.title}</h1>
-        {canEdit && (
-          <details className="move shrink-0" data-parent={currentParentSlug}>
-            <summary className="btn btn-ghost btn-sm" aria-label="이동할 위치">
-              위치: {currentParentLabel} ▾
-            </summary>
-            <form action={movePage.bind(null, spaceKey, slug)} className="move__panel">
-              <button name="parent" value="" className="move__item" disabled={!currentParent}>
-                (최상위)
-              </button>
-              {moveTargets.map((t) => (
-                <button
-                  key={t.id}
-                  name="parent"
-                  value={t.slug}
-                  className="move__item"
-                  style={{ paddingLeft: `${0.6 + t.depth * 0.9}rem` }}
-                  disabled={t.slug === currentParentSlug}
-                >
-                  {t.title}
-                </button>
-              ))}
-            </form>
-          </details>
-        )}
-      </div>
-
-      <p className="meta mt-2">
-        마지막 수정 {page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
-        <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
-      </p>
-      <div className="mt-3">
+      <header className="document-heading">
+        <h1 className="document-title">{page.title}</h1>
+        <p className="document-meta">
+          마지막 수정 <time dateTime={page.updatedAt.toISOString()}>{page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}</time>
+          <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
+        </p>
+      </header>
+      <article className="prose-wiki" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="document-reactions">
         <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>
-
-      <article className="prose-wiki mt-7" dangerouslySetInnerHTML={{ __html: html }} />
 
       {backlinks.length > 0 && (
         <aside className="mt-12 border-t pt-5">
@@ -170,7 +152,7 @@ export default async function PageView({
         </aside>
       )}
 
-      <section className="mt-12 border-t pt-6">
+      <section className="mt-6 border-t pt-6">
         <h2 className="section-title">
           댓글{comments.length > 0 && <span className="faint"> {comments.length}</span>}
         </h2>

@@ -44,6 +44,7 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type("\n\n두 번째 버전");
   await page.getByRole("button", { name: "저장" }).click();
+  await page.getByRole("button", { name: "문서 더보기" }).click();
   await page.getByRole("link", { name: "이력" }).click();
   await expect(page.getByRole("link", { name: "v2" })).toBeVisible();
   await expect(page.getByRole("link", { name: "v1" })).toBeVisible();
@@ -51,7 +52,8 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
   // 검색
   await page.getByPlaceholder("검색").fill("온보딩");
   await page.getByPlaceholder("검색").press("Enter");
-  await expect(page.getByRole("link", { name: "E2E 온보딩" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "E2E 온보딩" })).toBeVisible();
+  await expect(page.getByRole("searchbox")).toHaveValue("온보딩");
 });
 
 test("bob: restricted 스페이스는 보이지 않고 직접 접근도 404", async ({ page }) => {
@@ -413,7 +415,7 @@ test("웹 충돌 UX: 외부 수정 후 저장하면 충돌 배너, 재저장은 
 test("파일 첨부: 버튼으로 올리고 본문 다운로드 링크로 확인", async ({ page }) => {
   await login(page, "alice", "alice1234");
   await page.goto("/s/eng/new");
-  await page.locator('input[name="title"]').fill("파일 첨부 테스트");
+  await page.getByRole("textbox", { name: "제목" }).fill("파일 첨부 테스트");
 
   // 에디터(Crepe) 비동기 초기화가 끝나기 전의 change 이벤트는 무시된다(crepeRef 가드).
   // 다른 에디터 테스트처럼 본문 클릭으로 초기화 완료를 기다리고 커서도 본문에 둔다.
@@ -460,19 +462,21 @@ test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 삭제 
 
   // 조부모 → 부모 → 자식 3레벨 트리를 "하위 문서" 버튼으로 만든다.
   await page.goto("/s/eng/new");
-  await page.locator('input[name="title"]').fill("트리 조부모");
+  await page.getByRole("textbox", { name: "제목" }).fill("트리 조부모");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "트리 조부모" })).toBeVisible();
 
+  await page.getByRole("button", { name: "문서 더보기" }).click();
   await page.getByRole("link", { name: "하위 문서" }).click();
   await expect(page.getByText("'트리 조부모' 하위에 만듭니다.")).toBeVisible();
-  await page.locator('input[name="title"]').fill("트리 부모");
+  await page.getByRole("textbox", { name: "제목" }).fill("트리 부모");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "트리 부모" })).toBeVisible();
 
+  await page.getByRole("button", { name: "문서 더보기" }).click();
   await page.getByRole("link", { name: "하위 문서" }).click();
   await expect(page.getByText("'트리 부모' 하위에 만듭니다.")).toBeVisible();
-  await page.locator('input[name="title"]').fill("트리 자식");
+  await page.getByRole("textbox", { name: "제목" }).fill("트리 자식");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "트리 자식" })).toBeVisible();
 
@@ -488,12 +492,14 @@ test("페이지 트리: 하위 문서 생성 → 사이드바 트리 → 삭제 
   // 최상위(FK SET NULL)가 아니라 삭제된 노드의 부모인 "트리 조부모"로 승격된다.
   await page.goto("/s/eng/트리-부모");
   page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "문서 더보기" }).click();
   await page.getByRole("button", { name: "삭제" }).click();
   await expect(page).toHaveURL(/\/s\/eng$/);
   expect(await parentValueFresh("트리-자식")).toBe("트리-조부모");
 
   // 이동: 승격된 자식을 최상위로 옮긴다(웹 이동 액션). 새 컨텍스트로 persist 확인.
   await page.goto("/s/eng/트리-자식");
+  await page.getByRole("button", { name: "문서 더보기" }).click();
   await move().locator("summary").click();
   await move().locator('button[name="parent"][value=""]').click();
   // 이동 서버액션은 자식 페이지로 redirect한다(완료 대기). 검증은 새 컨텍스트로.
