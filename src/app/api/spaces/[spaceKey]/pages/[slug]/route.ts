@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { requireApiSpaceRole } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { updatePageInSpace, deletePageInSpace } from "@/lib/pages";
+import { deletePageInSpace } from "@/lib/page-trash";
+import { updatePageInSpace } from "@/lib/pages";
 import { PageConflictError } from "@/lib/page-edits";
 
 // GET /api/spaces/{spaceKey}/pages/{slug} — 페이지 마크다운 원문
@@ -15,7 +16,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: auth.space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: auth.space.id, slug } },
     select: { id: true, slug: true, title: true, content: true, version: true, updatedAt: true },
   });
   if (!page) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
@@ -118,7 +119,7 @@ export async function DELETE(
   const auth = await requireApiSpaceRole(req, spaceKey, "editor");
   if (!auth.ok) return auth.response;
 
-  const result = await deletePageInSpace({ spaceId: auth.space.id, slug });
-  if (!result.found) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
-  return Response.json({ deleted: true, slug });
+  const trashId = await deletePageInSpace(auth.space.id, slug, auth.actor.userId);
+  if (!trashId) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });
+  return Response.json({ deleted: true, slug, trashId });
 }

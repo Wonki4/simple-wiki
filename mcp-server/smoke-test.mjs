@@ -1,5 +1,6 @@
 // MCP 서버를 spawn해 도구를 실제 호출하는 스모크 테스트.
 // 사용: WIKI_API_TOKEN=... node smoke-test.mjs
+import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { fileURLToPath } from "node:url";
@@ -73,6 +74,18 @@ await call("delete_page", { space: "eng", slug: parentSlug });
 // 정리: 방금 만든 테스트 문서 삭제
 const del = await call("delete_page", { space: "eng", slug });
 console.log("\n[delete_page] isError=%s\n%s", del.isError, del.text);
+
+const { trashId } = JSON.parse(del.text);
+assert.ok(trashId);
+const trash = await call("list_trashed_pages", { space: "eng" });
+assert.ok(JSON.parse(trash.text).pages.some(page => page.id === trashId && page.slug === slug));
+const recovered = await call("restore_trashed_page", { space: "eng", id: trashId });
+assert.equal(JSON.parse(recovered.text).slug, slug);
+const recoveredPage = await call("get_page", { space: "eng", slug });
+assert.ok(!recoveredPage.isError);
+assert.ok(recoveredPage.text.includes("수정"));
+await call("delete_page", { space: "eng", slug });
+console.log("[trash] 삭제·목록·복원·본문 확인 통과");
 
 await client.close();
 console.log("\n=== smoke test done ===");

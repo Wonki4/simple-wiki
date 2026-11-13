@@ -13,7 +13,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: auth.space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: auth.space.id, slug } },
     select: { id: true },
   });
   if (!page) return Response.json({ error: "페이지가 없습니다." }, { status: 404 });

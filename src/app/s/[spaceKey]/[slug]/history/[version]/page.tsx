@@ -20,7 +20,7 @@ export default async function RevisionPage({
 
   const { space, role } = await requireSpaceRole(spaceKey, "viewer");
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
   });
   if (!page) notFound();
   const rev = await prisma.pageRevision.findUnique({
