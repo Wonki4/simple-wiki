@@ -119,16 +119,13 @@ export async function createPageInSpace(
   const slug = slugify(title);
   if (!slug) throw new Error("제목에 사용할 수 있는 문자가 없습니다.");
 
-  const existing = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: input.spaceId, slug } },
-  });
-  if (existing) return { slug, created: false };
-
   const source = input.source ?? "web";
   const viaLabel = input.viaLabel ?? null;
 
-  await prisma.$transaction(async (tx) => {
-    const page = await tx.page.create({
+  const created = await prisma.$transaction(async (tx) => {
+    const [page] = await tx.page.createManyAndReturn({
+      skipDuplicates: true,
+      select: { id: true },
       data: {
         spaceId: input.spaceId,
         slug,
@@ -141,13 +138,15 @@ export async function createPageInSpace(
         parentId: input.parentId ?? null,
       },
     });
+    if (!page) return false;
     await tx.pageRevision.create({
       data: { pageId: page.id, version: 1, title, content: input.content, authorId: input.authorId, source, viaLabel },
     });
     await syncLinks(tx, page.id, input.spaceId, input.content);
+    return true;
   });
 
-  return { slug, created: true };
+  return { slug, created };
 }
 
 /**

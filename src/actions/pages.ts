@@ -5,14 +5,20 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, requireSpaceRole } from "@/lib/access";
 import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace, deletePageInSpace } from "@/lib/pages";
+import type { PageDraft } from "@/lib/editor-draft";
 import { PageConflictError } from "@/lib/page-edits";
 
-export async function createPage(spaceKey: string, parentSlug: string | null, formData: FormData) {
+export type SaveResult =
+  | { savedHref: string }
+  | { conflict: true; currentVersion: number }
+  | { authRequired: true }
+  | { error: string };
+
+export async function createPage(spaceKey: string, parentSlug: string | null, draft: PageDraft): Promise<SaveResult> {
   // 에디터가 작성 중인 내용을 보관하고 재로그인할 수 있게 일반 이동 대신 신호를 돌려준다.
-  if (!(await getSessionInfo())) return { authRequired: true as const };
+  if (!(await getSessionInfo())) return { authRequired: true };
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
-  const title = String(formData.get("title") ?? "").trim();
-  const content = String(formData.get("content") ?? "");
+  const { title, content } = draft;
 
   let parentId: string | null = null;
   if (parentSlug) {
@@ -22,7 +28,7 @@ export async function createPage(spaceKey: string, parentSlug: string | null, fo
     });
     // 부모가 그사이 삭제된 경우 — 조용히 최상위로 만들지 않고 명시적으로 알린다.
     if (!parent) {
-      redirect(`/s/${spaceKey}/new?error=${encodeURIComponent("부모 문서가 없습니다. 삭제되었을 수 있습니다.")}`);
+      return { error: "부모 문서가 없습니다. 작성 내용을 복사한 뒤 다른 위치에 저장하세요." };
     }
     parentId = parent.id;
   }
@@ -34,24 +40,18 @@ export async function createPage(spaceKey: string, parentSlug: string | null, fo
     authorId: session.userId,
     parentId,
   });
-  // 같은 slug가 이미 있으면 그 페이지의 편집 화면으로 보낸다.
-  if (!created) redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}/edit`);
+  if (!created) return { error: "같은 주소의 문서가 이미 있습니다. 제목을 바꿔 다시 저장하세요." };
 
   revalidatePath(`/s/${spaceKey}`);
-  redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
+  return { savedHref: `/s/${spaceKey}/${encodeURIComponent(slug)}` };
 }
-
-export type SaveResult = { conflict: true; currentVersion: number } | { authRequired: true } | void;
 
 export async function updatePage(
   spaceKey: string,
   slug: string,
-  formData: FormData,
+  draft: PageDraft,
 ): Promise<SaveResult> {
-  const title = String(formData.get("title") ?? "").trim();
-  const content = String(formData.get("content") ?? "");
-  const ev = formData.get("expectedVersion");
-  const expectedVersion = typeof ev === "string" && ev !== "" ? Number(ev) : undefined;
+  const { title, content, expectedVersion } = draft;
 
   if (!(await getSessionInfo())) return { authRequired: true };
   const { session, space } = await requireSpaceRole(spaceKey, "editor");
@@ -74,7 +74,7 @@ export async function updatePage(
 
   revalidatePath(`/s/${spaceKey}`);
   revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
-  redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
+  return { savedHref: `/s/${spaceKey}/${encodeURIComponent(slug)}` };
 }
 
 export async function movePage(spaceKey: string, slug: string, formData: FormData) {
