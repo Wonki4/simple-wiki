@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTree, selfAndDescendantIds, flattenTree, type TreePageInput } from "@/lib/page-tree";
+import { buildTree, selfAndDescendantIds, flattenTree, visibleTreePages, type TreePageInput } from "@/lib/page-tree";
 
 const pages: TreePageInput[] = [
   { id: "1", slug: "guide", title: "가이드", parentId: null },
@@ -41,4 +41,18 @@ describe("flattenTree", () => {
       "2:심화",
     ]);
   });
+});
+
+it("여러 조상이 휴지통에 있어도 실제 트리는 유지하고 가장 가까운 상위 문서를 표시한다", () => {
+  const deleted = new Date();
+  const pages = [
+    { id: "root", parentId: null, deletedAt: null },
+    { id: "parent", parentId: "root", deletedAt: deleted },
+    { id: "child", parentId: "parent", deletedAt: deleted },
+    { id: "leaf", parentId: "child", deletedAt: null },
+  ];
+  expect(visibleTreePages(pages).map(p => [p.id, p.parentId])).toEqual([["root", null], ["leaf", "root"]]);
+  expect(pages[3].parentId).toBe("child");
+  expect(visibleTreePages(pages.map(p => p.id === "child" ? { ...p, deletedAt: null } : p))
+    .map(p => [p.id, p.parentId])).toEqual([["root", null], ["child", "root"], ["leaf", "child"]]);
 });

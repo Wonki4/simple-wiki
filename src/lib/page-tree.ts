@@ -78,3 +78,23 @@ export function flattenTree(
   }
   return out;
 }
+
+// 숨겨진 부모를 건너뛴 트리. 실제 parentId를 보존해야 나중에 어느 순서로든 복원할 수 있다.
+export function visibleTreePages<T extends { id: string; parentId: string | null; deletedAt: Date | null }>(pages: T[]) {
+  const byId = new Map(pages.map(page => [page.id, page]));
+  const resolved = new Map<string, string | null>();
+  function visibleParent(parentId: string | null) {
+    const skipped = new Set<string>();
+    while (parentId && byId.get(parentId)?.deletedAt) {
+      if (resolved.has(parentId) || skipped.has(parentId)) {
+        parentId = resolved.get(parentId) ?? null;
+        break;
+      }
+      skipped.add(parentId);
+      parentId = byId.get(parentId)!.parentId;
+    }
+    for (const id of skipped) resolved.set(id, parentId);
+    return parentId;
+  }
+  return pages.filter(page => !page.deletedAt).map(page => ({ ...page, parentId: visibleParent(page.parentId) }));
+}
