@@ -63,7 +63,7 @@ Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
 
 ## API · MCP (LLM 연동)
 
-- **개인 액세스 토큰(PAT)**: `/settings/tokens`에서 발급(`swk_...`). 토큰 소유자의 스페이스 권한을 그대로 상속.
+- **개인 액세스 토큰(PAT)**: `/settings/tokens`에서 발급(`swk_...`). 발급자 권한 안에서 읽기 전용 또는 읽기·쓰기를 선택하고, 전체 또는 스페이스 하나로 제한할 수 있습니다. 기존 토큰은 이전과 같은 범위로 동작합니다.
 - **REST API**: `Authorization: Bearer swk_...`
   - `GET /api/spaces` · `GET /api/spaces/{key}/pages` · `GET /api/spaces/{key}/pages/{slug}`
   - `POST /api/spaces/{key}/pages` · `PUT .../{slug}` · `DELETE .../{slug}` (editor)

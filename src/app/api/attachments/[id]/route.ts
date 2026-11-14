@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { resolveApiActor, rateLimitResponse } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { hasRole, resolveSpaceRole } from "@/lib/permissions";
+import { effectiveSpaceRole, hasRole } from "@/lib/permissions";
 import { storage, StorageNotFoundError } from "@/lib/storage";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     include: { space: { include: { permissions: true } } },
   });
   if (!att) return new Response("없습니다.", { status: 404 });
-  const role = resolveSpaceRole(actor, att.space.visibility, att.space.permissions);
+  const role = effectiveSpaceRole(actor, att.space);
   if (!hasRole(role, "viewer")) return new Response("없습니다.", { status: 404 });
 
   let body: ReadableStream<Uint8Array>;

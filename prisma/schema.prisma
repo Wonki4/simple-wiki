@@ -84,6 +84,9 @@ model ApiToken {
   name       String
   tokenHash  String    @unique
   prefix     String
+  readOnly   Boolean   @default(false)
+  spaceId    String?
+  space      Space?    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
 
@@ -116,6 +119,7 @@ model Space {
   pages       Page[]
   permissions SpacePermission[]
   attachments Attachment[]
+  apiTokens   ApiToken[]
 }
 
 model SpacePermission {

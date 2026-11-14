@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/access";
+import { listReadableSpaces, requireSession } from "@/lib/access";
 import { generateToken } from "@/lib/api-auth";
 
 export interface CreateTokenResult {
@@ -20,10 +20,16 @@ export async function createApiToken(
   const session = await requireSession();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "토큰 이름을 입력하세요." };
+  const access = formData.get("access");
+  const spaceId = formData.get("spaceId");
+  if (access !== "read" && access !== "write") return { ok: false, error: "토큰 권한을 선택하세요." };
+  if (typeof spaceId !== "string" || (spaceId && !(await listReadableSpaces(session)).some(s => s.id === spaceId))) {
+    return { ok: false, error: "사용할 수 있는 스페이스를 선택하세요." };
+  }
 
   const { raw, hash, prefix } = generateToken();
   await prisma.apiToken.create({
-    data: { userId: session.userId, name, tokenHash: hash, prefix },
+    data: { userId: session.userId, name, tokenHash: hash, prefix, readOnly: access === "read", spaceId: spaceId || null },
   });
   revalidatePath("/settings/tokens");
   return { ok: true, token: raw, name };

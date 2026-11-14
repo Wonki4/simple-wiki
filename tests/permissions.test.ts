@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSpaceRole, hasRole, type SessionInfo, type PermissionEntry } from "@/lib/permissions";
+import { effectiveSpaceRole, resolveSpaceRole, hasRole, type SessionInfo, type PermissionEntry } from "@/lib/permissions";
 
 // groups는 위키 자체 그룹(WikiGroup)의 id 목록이다 — Keycloak 클레임이 아니다.
 const alice: SessionInfo = { userId: "alice-sub", groups: ["grp-eng"], isWikiAdmin: false };
@@ -42,5 +42,16 @@ describe("hasRole", () => {
     expect(hasRole("editor", "viewer")).toBe(true);
     expect(hasRole("viewer", "editor")).toBe(false);
     expect(hasRole(null, "viewer")).toBe(false);
+  });
+});
+
+describe("effectiveSpaceRole", () => {
+  it("제한된 관리자 토큰도 범위 밖은 보지 못하고, 소유자 권한이 회수되면 범위 안에서도 접근하지 못한다", () => {
+    const tokenScope = { spaceId: "eng", readOnly: true };
+    const space = { id: "eng", visibility: "restricted" as const, permissions: perms };
+    expect(effectiveSpaceRole({ ...admin, tokenScope }, space)).toBe("viewer");
+    expect(effectiveSpaceRole({ ...admin, tokenScope }, { ...space, id: "else" })).toBeNull();
+    expect(effectiveSpaceRole({ ...alice, groups: [], tokenScope }, space)).toBeNull();
+    expect(effectiveSpaceRole({ ...alice, tokenScope: { spaceId: null, readOnly: false } }, space)).toBe("editor");
   });
 });

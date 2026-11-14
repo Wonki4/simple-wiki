@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { createApiToken, type CreateTokenResult } from "@/actions/tokens";
 
-export function CreateTokenForm() {
+export function CreateTokenForm({ spaces }: { spaces: { id: string; key: string; name: string }[] }) {
   const [state, formAction, pending] = useActionState<CreateTokenResult | null, FormData>(
     createApiToken,
     null,
@@ -15,6 +15,20 @@ export function CreateTokenForm() {
         <label className="field min-w-[16rem] flex-1">
           <span>토큰 이름 (예: MCP 서버)</span>
           <input name="name" required placeholder="어디에 쓰는 토큰인지" className="input" />
+        </label>
+        <label className="field">
+          <span>토큰 권한</span>
+          <select name="access" className="input" defaultValue="write">
+            <option value="write">읽기·쓰기</option>
+            <option value="read">읽기 전용</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>스페이스 범위</span>
+          <select name="spaceId" className="input" defaultValue="">
+            <option value="">접근 가능한 모든 스페이스</option>
+            {spaces.map(space => <option key={space.id} value={space.id}>{space.name} ({space.key})</option>)}
+          </select>
         </label>
         <button disabled={pending} className="btn btn-primary">
           {pending ? "발급 중..." : "토큰 발급"}
