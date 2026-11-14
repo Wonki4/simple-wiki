@@ -1,6 +1,6 @@
 import { Sidebar } from "./Sidebar";
 import { SpacePagesProvider } from "./SpacePagesContext";
-import { prisma } from "@/lib/db";
+import { getSpaceTree } from "@/lib/space-tree";
 import type { SpaceWithPermissions } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo } from "@/lib/permissions";
 
@@ -12,11 +12,7 @@ interface Props {
 }
 
 export async function WikiShell({ children, spaces, current, session }: Props) {
-  const pages = current ? await prisma.page.findMany({
-    where: { spaceId: current.id },
-    orderBy: { title: "asc" },
-    select: { id: true, slug: true, title: true, parentId: true },
-  }) : [];
+  const pages = current ? await getSpaceTree(current.id) : [];
   const role = current ? resolveSpaceRole(session, current.visibility, current.permissions) : null;
 
   return (

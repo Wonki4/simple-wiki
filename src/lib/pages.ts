@@ -39,7 +39,7 @@ async function commitRevision(input: {
   try {
     await prisma.$transaction(async (tx) => {
       await tx.page.update({
-        where: { id: input.page.id },
+        where: { id: input.page.id, deletedAt: null },
         data: {
           title: input.title,
           content: input.content,
@@ -164,7 +164,7 @@ export async function updatePageInSpace(
   if (!title) throw new Error("제목을 입력하세요.");
 
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
   if (!page) return { found: false };
 
@@ -201,7 +201,7 @@ export async function editPageContent(
   transform: (current: string) => string,
 ): Promise<{ found: boolean; version?: number }> {
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
   if (!page) return { found: false };
 
@@ -248,7 +248,7 @@ export async function revertPage(input: {
   expectedVersion?: number;
 }): Promise<{ found: boolean; missingRevision?: boolean; version?: number }> {
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
   if (!page) return { found: false };
 
@@ -270,25 +270,6 @@ export async function revertPage(input: {
   return { found: true, version };
 }
 
-/**
- * 페이지 삭제 — 자식은 삭제 문서의 부모로 승격한다(트리 내용 보존).
- * 웹 액션과 REST DELETE가 공유하는 유일한 삭제 경로.
- */
-export async function deletePageInSpace(input: { spaceId: string; slug: string }): Promise<{ found: boolean }> {
-  const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
-    select: { id: true, parentId: true },
-  });
-  if (!page) return { found: false };
-  await prisma.$transaction([
-    prisma.page.updateMany({ where: { parentId: page.id }, data: { parentId: page.parentId } }),
-    prisma.page.delete({ where: { id: page.id } }),
-  ]);
-  invalidatePageCache(page.id);
-  invalidateWikiNames(input.spaceId);
-  return { found: true };
-}
-
 export type MovePageResult =
   | { ok: true }
   | { ok: false; reason: "not-found" | "parent-not-found" | "cycle" };
@@ -302,20 +283,24 @@ export async function movePageInSpace(input: {
   slug: string;
   parentSlug: string | null;
 }): Promise<MovePageResult> {
-  const pages = await prisma.page.findMany({
-    where: { spaceId: input.spaceId },
-    select: { id: true, slug: true, parentId: true },
-  });
-  const page = pages.find((p) => p.slug === input.slug);
-  if (!page) return { ok: false, reason: "not-found" };
+  return prisma.$transaction(async tx => {
+    // 같은 트리의 동시 이동이 서로를 부모로 지정해 순환을 만들지 않도록 직렬화한다.
+    await tx.$queryRaw`SELECT id FROM "Space" WHERE id = ${input.spaceId} FOR UPDATE`;
+    const pages = await tx.page.findMany({
+      where: { spaceId: input.spaceId },
+      select: { id: true, slug: true, parentId: true, deletedAt: true },
+    });
+    const page = pages.find(p => !p.deletedAt && p.slug === input.slug);
+    if (!page) return { ok: false, reason: "not-found" };
 
-  let parentId: string | null = null;
-  if (input.parentSlug !== null) {
-    const parent = pages.find((p) => p.slug === input.parentSlug);
-    if (!parent) return { ok: false, reason: "parent-not-found" };
-    if (selfAndDescendantIds(pages, page.id).has(parent.id)) return { ok: false, reason: "cycle" };
-    parentId = parent.id;
-  }
-  await prisma.page.update({ where: { id: page.id }, data: { parentId } });
-  return { ok: true };
+    let parentId: string | null = null;
+    if (input.parentSlug !== null) {
+      const parent = pages.find(p => !p.deletedAt && p.slug === input.parentSlug);
+      if (!parent) return { ok: false, reason: "parent-not-found" };
+      if (selfAndDescendantIds(pages, page.id).has(parent.id)) return { ok: false, reason: "cycle" };
+      parentId = parent.id;
+    }
+    await tx.page.update({ where: { id: page.id, deletedAt: null }, data: { parentId } });
+    return { ok: true };
+  });
 }

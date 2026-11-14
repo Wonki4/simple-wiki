@@ -325,6 +325,8 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       {conflictVersion !== undefined && (
         <div className="notice notice-warn" role="alert">
           다른 사람이 이 페이지를 먼저 수정했습니다(현재 v{conflictVersion}).{" "}
+          <a className="linklike" href={`${cancelHref}/history?from=${draftRef.current.expectedVersion}&to=${conflictVersion}`}
+            target="_blank" rel="noopener noreferrer">저장된 버전 비교</a>{" · "}
           <button
             type="button"
             className="linklike"

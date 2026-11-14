@@ -39,7 +39,7 @@ export async function listCommentedPages(
 ): Promise<CommentedPage[]> {
   if (readableSpaceIds.length === 0) return [];
   const comments = await prisma.comment.findMany({
-    where: { authorId: userId, page: { spaceId: { in: readableSpaceIds } } },
+    where: { authorId: userId, page: { deletedAt: null, spaceId: { in: readableSpaceIds } } },
     orderBy: { createdAt: "desc" },
     include: {
       page: { select: { slug: true, title: true, space: { select: { key: true, name: true } } } },

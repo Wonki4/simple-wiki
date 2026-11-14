@@ -12,7 +12,7 @@ export async function addComment(spaceKey: string, slug: string, formData: FormD
   if (!body) return;
 
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
     select: { id: true },
   });
   if (!page) return;
@@ -27,7 +27,7 @@ export async function addComment(spaceKey: string, slug: string, formData: FormD
 export async function deleteComment(spaceKey: string, slug: string, commentId: string) {
   const { session, space, role } = await requireSpaceRole(spaceKey, "viewer");
   const comment = await prisma.comment.findUnique({
-    where: { id: commentId },
+    where: { id: commentId, page: { deletedAt: null } },
     select: { authorId: true, page: { select: { spaceId: true } } },
   });
   if (!comment || comment.page.spaceId !== space.id) return;
