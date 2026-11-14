@@ -1131,6 +1131,16 @@ mark {
 .markdown-source { display: block; width: 100%; min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); color: var(--ink); font: .9rem/1.7 var(--font-mono); tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-input { min-height: 18rem; height: 48vh; resize: vertical; }
+.wiki-link-options {
+  position: fixed; z-index: 30; width: min(19rem, calc(100vw - 1rem)); max-height: min(15rem, 42vh);
+  overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: .25rem; list-style: none;
+  border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow);
+}
+.wiki-link-options li { padding: .45rem .65rem; border-radius: 5px; overflow-wrap: anywhere; font-size: .9rem; }
+.wiki-link-options [role="option"] { cursor: pointer; color: var(--ink); }
+.wiki-link-options [role="option"]:is(:hover, [aria-selected="true"]) { background: var(--surface-2); }
+.wiki-link-options small { display: block; font: .75rem/1.4 var(--font-mono); color: var(--muted); }
+.wiki-link-empty { color: var(--muted); }
 .article-toc { max-width: 44rem; margin-block: 0 1.6rem; border-block: 1px solid var(--border); }
 .article-toc summary { cursor: pointer; padding-block: .7rem; font-weight: 650; color: var(--ink-2); }
 .article-toc summary span { margin-left: .3rem; color: var(--muted); font-size: .8rem; }

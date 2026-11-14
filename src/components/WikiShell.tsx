@@ -1,4 +1,5 @@
 import { Sidebar } from "./Sidebar";
+import { SpacePagesProvider } from "./SpacePagesContext";
 import { getSpaceTree } from "@/lib/space-tree";
 import type { SpaceWithPermissions } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo } from "@/lib/permissions";
@@ -25,7 +26,9 @@ export async function WikiShell({ children, spaces, current, session }: Props) {
         canManage={hasRole(role, "admin")}
         isWikiAdmin={session.isWikiAdmin}
       />
-      <div className="shell__content"><div className="shell__inner">{children}</div></div>
+      <div className="shell__content"><div className="shell__inner">
+        <SpacePagesProvider pages={pages}>{children}</SpacePagesProvider>
+      </div></div>
     </div>
   );
 }

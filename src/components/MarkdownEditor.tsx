@@ -11,6 +11,8 @@ import { applySourceEdit } from "@/lib/source-edit";
 import type { SaveResult } from "@/actions/pages";
 import { WikiIcon } from "./WikiIcon";
 import { MarkdownModeSwitch } from "./MarkdownModeSwitch";
+import { WikiLinkCompletion } from "./WikiLinkCompletion";
+import { blockLinkTarget, sourceLinkTarget } from "@/lib/editor-link-target";
 import { useEffect, useRef, useState } from "react";
 import type { Crepe as CrepeType } from "@milkdown/crepe";
 import { insert, replaceAll } from "@milkdown/kit/utils";
@@ -89,6 +91,12 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
     draftRef.current.content = applySourceEdit(draftRef.current.content, value);
     setSourceText(value);
     persistDraft();
+  }
+
+  function readLinkTarget() {
+    if (saving || uploadPending) return null;
+    if (showSource) return textareaRef.current && sourceLinkTarget(textareaRef.current, editSource);
+    return crepeRef.current?.editor.action(ctx => blockLinkTarget(ctx.get(editorViewCtx))) ?? null;
   }
 
   useEffect(() => {
@@ -356,12 +364,14 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
         <MarkdownModeSwitch editing source={showSource} onChange={changeMode}
           disabled={!draftLoaded || saving || uploadPending} disableFormatted={!ready} />
       </div>
-      {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
-        value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
-        placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
-      <div className="wysiwyg" hidden={showSource}>
-        <div ref={holderRef} />
-      </div>
+      <WikiLinkCompletion readTarget={readLinkTarget}>
+        {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
+          value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
+          placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
+        <div className="wysiwyg" hidden={showSource}>
+          <div ref={holderRef} />
+        </div>
+      </WikiLinkCompletion>
       <div className="editor-footer">
         <button
           type="button"
