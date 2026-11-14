@@ -21,7 +21,10 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
       </header>
       <div className="collection-label flex items-center justify-between gap-3">
         <h2>최근 수정한 문서</h2>
-        {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
+        <div className="flex items-center gap-2">
+          <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/attachments`}><WikiIcon name="attach" />첨부파일</Link>
+          {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
+        </div>
       </div>
       {pages.length > 0 ? (
         <ul className="recent-list">

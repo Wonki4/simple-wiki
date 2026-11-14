@@ -1176,6 +1176,13 @@ mark {
 @keyframes dismiss-copy { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
 
 .trash-list > li { padding-block: 1rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.attachment-search { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+.attachment-search .input { width: min(100%, 18rem); }
+.attachment-list > li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem 1.5rem; padding-block: 1rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.attachment-list h3 { display: flex; align-items: baseline; gap: .45rem; font-weight: 600; }
+.attachment-list .wiki-icon { flex: none; color: var(--muted); align-self: flex-start; margin-top: .2rem; }
+.attachment-list .meta { margin-block: .2rem; }
+@media (max-width: 600px) { .attachment-list > li { grid-template-columns: 1fr; } }
 .trash-list form, .diff-picker { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
 .trash-list .notice { flex-basis: 100%; }
 .diff-picker { margin-block: 1.25rem; }
