@@ -1123,6 +1123,22 @@ mark {
   .wysiwyg .milkdown .ProseMirror { min-height: 12rem; }
 }
 
+.shell__inner:has(.editor-with-preview) { max-width: 84rem; }
+.document:has(.editor-with-preview) { max-width: none; container-type: inline-size; }
+.editor-with-preview { display: flex; flex-direction: column; }
+.editor-with-preview > .editor-footer { order: 1; }
+.editor-with-preview > .source-preview { margin-top: 1rem; }
+.source-preview { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.source-preview-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+.source-preview-heading h2 { font-size: .9rem; font-weight: 650; color: var(--ink-2); }
+@container (min-width: 48rem) {
+  .editor-with-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1rem; align-items: start; }
+  .editor-with-preview > * { grid-column: 1 / -1; }
+  .editor-with-preview > .markdown-tools + * { grid-column: 1; min-width: 0; }
+  .editor-with-preview > .source-preview { grid-column: 2; margin-top: 0; }
+  .source-preview { min-height: 18rem; max-height: max(18rem, 48vh); overflow: auto; }
+}
+
 .markdown-tools { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.1rem; }
 .markdown-mode { display: inline-flex; gap: .15rem; padding: .2rem; background: var(--surface-2); border-radius: var(--radius); }
 .markdown-mode button { padding: .35rem .8rem; border: 1px solid transparent; border-radius: calc(var(--radius) - 2px); font-size: .85rem; color: var(--muted); }
