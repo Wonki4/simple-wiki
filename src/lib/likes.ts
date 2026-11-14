@@ -26,7 +26,7 @@ export interface LikedPage {
 export async function listLikedPages(userId: string, readableSpaceIds: string[]): Promise<LikedPage[]> {
   if (readableSpaceIds.length === 0) return [];
   const likes = await prisma.like.findMany({
-    where: { userId, page: { spaceId: { in: readableSpaceIds } } },
+    where: { userId, page: { deletedAt: null, spaceId: { in: readableSpaceIds } } },
     orderBy: { createdAt: "desc" },
     include: {
       page: { select: { slug: true, title: true, space: { select: { key: true, name: true } } } },

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
+import { getSpaceTree } from "@/lib/space-tree";
 import { getBacklinks } from "@/lib/wiki-link-destinations";
 import { WikiArticle } from "@/components/WikiArticle";
 import { getRenderedPage } from "@/lib/page-render-cache";
@@ -31,7 +32,7 @@ export default async function PageView({
   const canEdit = hasRole(role, "editor");
 
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
   });
 
   if (!page) {
@@ -67,17 +68,13 @@ export default async function PageView({
   const backlinks = await getBacklinks(space.id, slug);
 
   // 이동 드롭다운: 자기 자신·자손 제외한 전체 문서(트리 순서·들여쓰기)
-  const allPages = canEdit
-    ? await prisma.page.findMany({
-        where: { spaceId: space.id },
-        select: { id: true, slug: true, title: true, parentId: true },
-      })
-    : [];
+  const allPages = canEdit ? await getSpaceTree(space.id) : [];
   const blocked = canEdit ? selfAndDescendantIds(allPages, page.id) : new Set<string>();
   const moveTargets = canEdit
     ? flattenTree(buildTree(allPages)).filter((t) => !blocked.has(t.id))
     : [];
-  const currentParent = allPages.find((p) => p.id === page.parentId);
+  const visibleParentId = allPages.find(p => p.id === page.id)?.parentId;
+  const currentParent = allPages.find(p => p.id === visibleParentId);
   const currentParentSlug = currentParent?.slug ?? "";
   const documentUrl = `/s/${spaceKey}/${encodeURIComponent(slug)}`;
 
@@ -88,7 +85,7 @@ export default async function PageView({
         <Link href={`/s/${spaceKey}`} className="document-path">
           <WikiIcon name="book" /><span>{space.name}</span>
         </Link>
-        {canEdit && (
+        {canEdit ? (
           <div className="document-actions">
             <Link href={`${documentUrl}/edit`} className="btn btn-ghost"><WikiIcon name="edit" />편집</Link>
             <Disclosure label="문서 더보기" trigger={<WikiIcon name="more" />}>
@@ -117,11 +114,11 @@ export default async function PageView({
                 </form>
               </details>
               <form action={deletePage.bind(null, spaceKey, slug)}>
-                <ConfirmSubmitButton message="이 페이지를 삭제할까요?" className="menu-item danger-text">삭제</ConfirmSubmitButton>
+                <ConfirmSubmitButton message="이 문서를 휴지통으로 옮길까요? 휴지통에서 복원할 수 있습니다." className="menu-item danger-text">삭제</ConfirmSubmitButton>
               </form>
             </Disclosure>
           </div>
-        )}
+        ) : <Link href={`${documentUrl}/history`} className="btn btn-ghost">이력</Link>}
       </div>
 
       <header className="document-heading">
