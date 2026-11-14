@@ -11,6 +11,7 @@ import { applySourceEdit } from "@/lib/source-edit";
 import type { SaveResult } from "@/actions/pages";
 import { WikiIcon } from "./WikiIcon";
 import { MarkdownModeSwitch } from "./MarkdownModeSwitch";
+import { MarkdownPreview } from "./MarkdownPreview";
 import { WikiLinkCompletion } from "./WikiLinkCompletion";
 import { blockLinkTarget, sourceLinkTarget } from "@/lib/editor-link-target";
 import { useEffect, useRef, useState } from "react";
@@ -36,6 +37,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
   const [ready, setReady] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [showSource, setShowSource] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [sourceText, setSourceText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
@@ -361,15 +363,23 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       <div className="markdown-tools">
         <MarkdownModeSwitch editing source={showSource} onChange={changeMode}
           disabled={!draftLoaded || saving || uploadPending} disableFormatted={!ready} />
+        {showSource && <button type="button" className="btn btn-ghost btn-sm"
+          aria-expanded={showPreview} aria-controls={showPreview ? "source-preview" : undefined}
+          onClick={() => setShowPreview(open => !open)}>
+          {showPreview ? "미리보기 닫기" : "미리보기 열기"}
+        </button>}
       </div>
-      <WikiLinkCompletion readTarget={readLinkTarget}>
-        {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
-          value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
-          placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
-        <div className="wysiwyg" hidden={showSource}>
-          <div ref={holderRef} />
-        </div>
-      </WikiLinkCompletion>
+      <div className={showSource && showPreview ? "editor-with-preview" : undefined}>
+        <WikiLinkCompletion readTarget={readLinkTarget}>
+          {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
+            value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
+            placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
+          <div className="wysiwyg" hidden={showSource}>
+            <div ref={holderRef} />
+          </div>
+        </WikiLinkCompletion>
+        {showSource && showPreview && <MarkdownPreview id="source-preview" spaceKey={spaceKey} content={sourceText} />}
+      </div>
       <div className="editor-footer">
         <button
           type="button"

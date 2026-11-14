@@ -1131,6 +1131,16 @@ mark {
 .markdown-source { display: block; width: 100%; min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); color: var(--ink); font: .9rem/1.7 var(--font-mono); tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-input { min-height: 18rem; height: 48vh; resize: vertical; }
+.shell__inner:has(.editor-with-preview) { max-width: 84rem; }
+.document:has(.editor-with-preview) { max-width: none; container-type: inline-size; }
+.editor-with-preview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+.source-preview { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.source-preview-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+.source-preview-heading h2 { font-size: .9rem; font-weight: 650; color: var(--ink-2); }
+@container (min-width: 48rem) {
+  .editor-with-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .source-preview { min-height: 18rem; max-height: max(18rem, 48vh); overflow: auto; }
+}
 .wiki-link-options {
   position: fixed; z-index: 30; width: min(19rem, calc(100vw - 1rem)); max-height: min(15rem, 42vh);
   overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: .25rem; list-style: none;
