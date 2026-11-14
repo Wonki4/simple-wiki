@@ -1,7 +1,7 @@
 import { Disclosure } from "@/components/Disclosure";
 import { WikiIcon } from "@/components/WikiIcon";
 import Link from "next/link";
-import { requireSpaceRole } from "@/lib/access";
+import { listReadableSpaces, requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { getSpaceTree } from "@/lib/space-tree";
@@ -57,15 +57,16 @@ export default async function PageView({
   const likeState = await getLikeState(page.id, session.userId);
   const comments = await listComments(page.id);
   const canModerate = hasRole(role, "admin");
+  const readable = await listReadableSpaces(session);
   const article = await getRenderedPage({
     pageId: page.id,
     version: page.version,
     content: page.content,
     spaceId: space.id,
-    spaceKey,
+    spaceKey, readable,
   });
 
-  const backlinks = await getBacklinks(space.id, slug);
+  const backlinks = await getBacklinks(space, slug, readable);
 
   // 이동 드롭다운: 자기 자신·자손 제외한 전체 문서(트리 순서·들여쓰기)
   const allPages = canEdit ? await getSpaceTree(space.id) : [];
@@ -138,9 +139,9 @@ export default async function PageView({
           <h2 className="eyebrow">이 페이지를 링크한 문서</h2>
           <ul className="mt-3 grid gap-1.5 text-sm">
             {backlinks.map((b) => (
-              <li key={b.slug}>
-                <Link href={`/s/${spaceKey}/${encodeURIComponent(b.slug)}`} className="title-link">
-                  {b.title}
+              <li key={`${b.spaceKey}/${b.slug}`}>
+                <Link href={`/s/${b.spaceKey}/${encodeURIComponent(b.slug)}`} className="title-link">
+                  {b.spaceKey === spaceKey ? b.title : `${b.spaceKey} · ${b.title}`}
                 </Link>
               </li>
             ))}

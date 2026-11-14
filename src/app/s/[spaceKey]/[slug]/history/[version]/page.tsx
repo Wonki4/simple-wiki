@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireSpaceRole } from "@/lib/access";
+import { listReadableSpaces, requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { getRenderedPage } from "@/lib/page-render-cache";
@@ -18,7 +18,7 @@ export default async function RevisionPage({
   const version = Number(versionStr);
   if (!Number.isInteger(version) || version < 1) notFound();
 
-  const { space, role } = await requireSpaceRole(spaceKey, "viewer");
+  const { space, role, session } = await requireSpaceRole(spaceKey, "viewer");
   const page = await prisma.page.findUnique({
     where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
   });
@@ -30,7 +30,7 @@ export default async function RevisionPage({
 
   const latest = await prisma.pageRevision.aggregate({ where: { pageId: page.id }, _max: { version: true } });
   const isLatest = latest._max.version === version;
-  const article = await getRenderedPage({ pageId: page.id, version, spaceId: space.id, spaceKey, content: rev.content });
+  const article = await getRenderedPage({ pageId: page.id, version, spaceId: space.id, spaceKey, content: rev.content, readable: await listReadableSpaces(session) });
 
   return (
     <main className="py-10">

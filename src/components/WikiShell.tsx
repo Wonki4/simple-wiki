@@ -27,7 +27,7 @@ export async function WikiShell({ children, spaces, current, session }: Props) {
         isWikiAdmin={session.isWikiAdmin}
       />
       <div className="shell__content"><div className="shell__inner">
-        <SpacePagesProvider pages={pages}>{children}</SpacePagesProvider>
+        <SpacePagesProvider pages={pages} spaces={spaces.map(({ key, name }) => ({ key, name }))}>{children}</SpacePagesProvider>
       </div></div>
     </div>
   );

@@ -43,16 +43,45 @@ export async function getWikiDestinations(spaceId: string) {
   return new Map(entries);
 }
 
-export async function getBacklinks(spaceId: string, slug: string) {
-  const destinations = await getWikiDestinations(spaceId);
+type LinkSpace = { key: string; id: string };
+
+export async function wikiLinkOptions(space: LinkSpace, others: LinkSpace[]) {
+  const [destinations, entries] = await Promise.all([
+    getWikiDestinations(space.id),
+    Promise.all(others.map(async s => [s.key, await getWikiDestinations(s.id)] as const)),
+  ]);
+  return { spaceKey: space.key, destinations, otherSpaces: new Map(entries) };
+}
+
+export function linkedSpaces(content: string, currentKey: string, readable: LinkSpace[]) {
+  const keys = new Set(extractWikiLinks(content).map(link => link.space));
+  return readable.filter(s => s.key !== currentKey && keys.has(s.key));
+}
+
+export async function getBacklinks(space: LinkSpace, slug: string, readable: LinkSpace[]) {
+  const destinations = await getWikiDestinations(space.id);
   const keys = [...destinations].filter(([, target]) => target === slug).map(([key]) => key);
   const candidates = await prisma.page.findMany({
-    where: { spaceId, deletedAt: null, linksFrom: { some: { toSpaceId: spaceId, toSlug: { in: keys } } } },
-    select: { slug: true, title: true, content: true },
-    orderBy: { title: "asc" },
+    where: {
+      spaceId: { in: readable.map(s => s.id) }, deletedAt: null,
+      OR: [
+        { linksFrom: { some: { toSpaceId: space.id, toSlug: { in: keys } } } },
+        // Also find links written before scoped targets and sections were indexed.
+        { content: { contains: `${space.key}:` } },
+        { spaceId: space.id, AND: [{ content: { contains: "[[" } }, { content: { contains: "#" } }] },
+      ],
+    },
+    select: { slug: true, title: true, content: true, space: { select: { key: true, id: true } } },
+    orderBy: [{ title: "asc" }, { slug: "asc" }],
   });
-  // 기존 색인에는 코드 예시도 들어 있다. 다시 저장하기 전에도 잘못된 백링크를 노출하지 않는다.
-  return candidates
-    .filter(page => extractWikiLinks(page.content).some(link => destinations.get(link.slug) === slug))
-    .map(({ title, slug }) => ({ title, slug }));
+  const localNames = new Map([[space.id, destinations]]);
+  const sources = new Map(candidates.map(page => [page.space.id, page.space]));
+  await Promise.all([...sources.values()].filter(s => s.id !== space.id).map(async s => {
+    localNames.set(s.id, await getWikiDestinations(s.id));
+  }));
+  return candidates.filter(page => extractWikiLinks(page.content).some(link => {
+    const literal = link.slug && (link.space || link.section !== undefined) && localNames.get(page.space.id)?.get(slugify(link.target));
+    if (literal) return page.space.id === space.id && literal === slug;
+    return (link.space ?? page.space.key) === space.key && destinations.get(link.slug) === slug;
+  })).map(({ title, slug, space: source }) => ({ title, slug, spaceKey: source.key }));
 }

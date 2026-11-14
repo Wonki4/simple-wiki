@@ -58,3 +58,10 @@ it("인라인 코드, 코드 블록, 링크 안의 텍스트는 색인에서 제
   const links = extractWikiLinks("**[[실제]]**\n\n`[[코드]]`\n\n~~~md\n[[예시]]\n~~~\n\n[**[[링크]]**](/guide)");
   expect(links.map(link => link.slug)).toEqual(["실제"]);
 });
+
+it("다른 스페이스와 문서·소제목·별칭을 분리하고 코드 예시를 건너뛴다", () => {
+  const links = extractWikiLinks("[[eng:배포 가이드#설치|절차]] [[#설치]] [[로컬#설치]] `[[secret:private]]`");
+  expect(links.map(({ space, slug, section, label }) => [space, slug, section, label])).toEqual([
+    ["eng", "배포-가이드", "설치", "절차"], [undefined, "", "설치", "#설치"], [undefined, "로컬", "설치", "로컬#설치"],
+  ]);
+});
