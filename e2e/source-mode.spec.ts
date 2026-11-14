@@ -38,14 +38,14 @@ test("원문에서 한 줄 수정 후 새로고침·모드 전환·저장을 해
   expect((await (await page.request.get(`${api}/${title}`)).json()).content).toBe(updated);
 });
 
-test("읽기 권한으로 현재와 과거 버전의 원문을 구분해 보고 복사한다", async ({ page, browser }) => {
+test("읽기 권한으로 현재와 과거 버전의 원문을 구분해 보고 복사한다", async ({ page, browser, baseURL }) => {
   await login(page, "wiki-admin", "admin1234");
   const title = `raw-read-${Date.now()}`;
   const latest = "# 최신\n\n새 본문\n";
   expect((await page.request.post(api, { data: { title, content: original } })).status()).toBe(201);
   expect((await page.request.put(`${api}/${title}`, { data: { title, content: latest } })).ok()).toBe(true);
   const reader = await browser.newContext({ viewport: { width: 320, height: 800 } });
-  await reader.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:3000" });
+  await reader.grantPermissions(["clipboard-read", "clipboard-write"], { origin: baseURL });
   const view = await reader.newPage();
   await login(view, "bob", "bob1234");
   for (const [suffix, source] of [["", latest], ["/history/1", original]]) {

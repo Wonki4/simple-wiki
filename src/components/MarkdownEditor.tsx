@@ -10,6 +10,8 @@ import { readDraft, storeDraft, type LocalDraft, type PageDraft } from "@/lib/ed
 import { applySourceEdit } from "@/lib/source-edit";
 import type { SaveResult } from "@/actions/pages";
 import { MarkdownPreview } from "./MarkdownPreview";
+import type { UploadedAttachment } from "@/lib/attachment-upload";
+import { useAttachmentUploads } from "./useAttachmentUploads";
 import { WikiIcon } from "./WikiIcon";
 import { MarkdownModeSwitch } from "./MarkdownModeSwitch";
 import { WikiLinkCompletion } from "./WikiLinkCompletion";
@@ -51,10 +53,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
   const readContentRef = useRef<(() => string) | null>(null);
   const loadContentRef = useRef<((source: string) => void) | null>(null);
   const discardedRef = useRef(false);
-  const [uploading, setUploading] = useState(false);
-  const [pendingImageBatches, setPendingImageBatches] = useState(0);
-  const [imageUploadError, setImageUploadError] = useState("");
-  const uploadPending = uploading || pendingImageBatches > 0;
+  const { upload, retry, dismiss, failures, retrying, uploadPending } = useAttachmentUploads(spaceKey);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function persistDraft() {
@@ -134,17 +133,19 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
             mode: "block",
           },
           [Crepe.Feature.ImageBlock]: {
-            onUpload: async (file: File): Promise<string> => {
-              const fd = new FormData();
-              fd.append("file", file);
-              const res = await fetch(`/api/spaces/${spaceKey}/attachments`, {
-                method: "POST",
-                body: fd,
+            // 블록 모드에서는 Milkdown이 원래 이미지의 주소를 설정한다.
+            onUpload: (file: File) => new Promise<string>(resolve => {
+              void upload(file, attachment => {
+                if (draftRef.current.mode === "source") {
+                  insertAttachment(file, attachment);
+                  resolve("");
+                } else {
+                  resolve(attachment.url);
+                }
+              }, () => resolve("")).then(result => {
+                if (result) resolve(result.url);
               });
-              if (!res.ok) throw new Error("upload failed");
-              const { url } = (await res.json()) as { url: string };
-              return url;
-            },
+            }),
           },
         },
       });
@@ -159,18 +160,14 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
           status.textContent = "이미지 올리는 중…";
           return Decoration.widget(pos, status, spec);
         },
-        async uploader(...args) {
-          setImageUploadError("");
-          setPendingImageBatches(n => n + 1);
-          try {
-            return await config.uploader(...args);
-          } catch {
-            if (!destroyed) setImageUploadError("이미지를 올리지 못했습니다. 다시 시도해 주세요.");
-            // Milkdown removes this batch's widget on resolution only.
-            return [];
-          } finally {
-            if (!destroyed) setPendingImageBatches(n => n - 1);
-          }
+        async uploader(files, schema) {
+          const images = Array.from(files).filter(file => file.type.startsWith("image/"));
+          const nodes = await Promise.all(images.map(async file => {
+            const result = await upload(file, attachment => insertAttachment(file, attachment));
+            return result && schema.nodes["image-block"].create({ src: result.url });
+          }));
+          // 성공한 이미지만 원래 붙여넣기·드롭 위치에 삽입하고 진행 표시를 정리한다.
+          return nodes.filter(node => node !== undefined);
         },
       })));
       await crepe.create();
@@ -221,48 +218,27 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 파일 첨부 버튼: 순차 업로드 후 커서 위치에 링크 삽입(이미지는 인라인 이미지).
-  // 실패하면 성공분 링크는 유지하고 그 파일부터 중단한다.
-  async function attachFiles(files: FileList | null) {
-    if (!files || files.length === 0 || (!crepeRef.current && !textareaRef.current)) {
-      // 에디터 준비 전에 고른 파일도 같은 파일로 재시도할 수 있게 초기화.
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
+  function insertAttachment(file: File, { url, filename }: UploadedAttachment) {
+    const label = filename.replace(/[[\]]/g, "");
+    const markdown = file.type.startsWith("image/") ? `![${label}](${url})` : `[${label}](${url})`;
+    if (draftRef.current.mode === "source") {
+      const input = textareaRef.current;
+      if (!input) return;
+      input.setRangeText(markdown, input.selectionStart, input.selectionEnd, "end");
+      editSource(input.value);
+      input.focus();
+    } else {
+      crepeRef.current?.editor.action(insert(markdown));
     }
-    setUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch(`/api/spaces/${spaceKey}/attachments`, { method: "POST", body: fd });
-        if (!res.ok) {
-          alert(`파일 업로드에 실패했습니다: ${file.name}`);
-          break;
-        }
-        const { url, filename } = (await res.json()) as { url: string; filename: string };
-        // 링크 텍스트의 대괄호는 마크다운 링크 문법을 깨므로 제거한다.
-        const label = filename.replace(/[[\]]/g, "");
-        const md = file.type.startsWith("image/") ? `![${label}](${url})` : `[${label}](${url})`;
-        // await 사이에 언마운트되면(저장 후 이동 등) cleanup이 ref를 비운다 — 남은 삽입은 중단.
-        if (draftRef.current.mode === "source") {
-          const input = textareaRef.current;
-          if (!input) break;
-          input.setRangeText(md, input.selectionStart, input.selectionEnd, "end");
-          editSource(input.value);
-          input.focus();
-        } else {
-          const crepe = crepeRef.current;
-          if (!crepe) break;
-          crepe.editor.action(insert(md));
-        }
-      }
-    } catch {
-      // 네트워크 단절 등 fetch 자체가 거부된 경우 — HTTP 에러와 동일한 방식으로 안내.
-      alert("파일 업로드에 실패했습니다. 네트워크 상태를 확인하세요.");
-    } finally {
-      setUploading(false);
-      // 같은 파일을 연속으로 다시 선택할 수 있도록 초기화.
-      if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function attachFiles(input: HTMLInputElement) {
+    const files = Array.from(input.files ?? []);
+    input.value = "";
+    for (const file of files) {
+      const insertFile = (attachment: UploadedAttachment) => insertAttachment(file, attachment);
+      const result = await upload(file, insertFile);
+      if (result) insertFile(result);
     }
   }
 
@@ -319,7 +295,6 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
         </div>
       </div>
       {error && <div className="notice notice-warn" role="alert">{error}</div>}
-      {imageUploadError && <div className="notice notice-warn" role="alert">{imageUploadError}</div>}
       {storageFailed && <div className="notice notice-warn" role="alert">초안을 이 탭에 보관할 수 없습니다. 이동하기 전에 내용을 복사하세요.</div>}
       {restored && <p className="meta" role="status">이 탭에 보관한 초안을 복원했습니다.</p>}
       {conflictVersion !== undefined && (
@@ -373,7 +348,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       </div>
       <WikiLinkCompletion readTarget={readLinkTarget}>
         {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
-          value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
+          value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploadPending}
           placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
         <div className="wysiwyg" hidden={showSource}>
           <div ref={holderRef} />
@@ -386,13 +361,30 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
           disabled={!canEdit || saving || uploadPending}
           onClick={() => fileInputRef.current?.click()}
         >
-          <WikiIcon name="attach" />{uploading ? "올리는 중…" : "파일 첨부"}
+          <WikiIcon name="attach" />{uploadPending ? "올리는 중…" : "파일 첨부"}
         </button>
         <p className="meta">
           {showSource ? "파일을 첨부하면 커서 위치에 마크다운 링크가 들어갑니다." : "이미지는 끌어다 놓고, 문서는 [[제목]]으로 연결하세요."}
         </p>
+        {failures.length > 0 && (
+          <ul className="upload-failures" aria-label="업로드 실패 목록">
+            {failures.map(failure => (
+              <li key={failure.id} className="notice notice-warn">
+                <div role="alert"><strong>{failure.file.name}</strong> · {failure.reason}</div>
+                <div className="upload-failure-actions">
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={saving || uploadPending}
+                    onClick={() => retry(failure)}>
+                    {retrying === failure.id ? "다시 올리는 중…" : "다시 시도"}
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={saving || retrying === failure.id}
+                    onClick={() => dismiss(failure)}>목록에서 제거</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => attachFiles(e.target.files)} />
+      <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => attachFiles(e.currentTarget)} />
       {showSource && showPreview && <MarkdownPreview id="source-preview" spaceKey={spaceKey} content={sourceText} />}
     </form>
   );

@@ -1070,6 +1070,9 @@ mark {
 }
 .editor-title::placeholder { color: var(--faint); }
 .editor-footer { flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.upload-failures { flex: 1 0 100%; min-width: 0; display: grid; gap: .5rem; }
+.upload-failures li { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; overflow-wrap: anywhere; }
+.upload-failure-actions { display: flex; gap: .25rem; margin-inline-start: auto; }
 .editor-footer .meta { color: var(--muted); font-family: var(--font-sans); }
 .collection-heading { margin: 1.4rem 0 2.6rem; }
 .collection-heading p { color: var(--muted); margin-top: .75rem; }
