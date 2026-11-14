@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
+import { uploadConfig } from "@milkdown/kit/plugin/upload";
+import { Decoration } from "@milkdown/kit/prose/view";
 import { configureWikiLinkMarkdown } from "@/lib/editor-markdown";
 import { readDraft, storeDraft, type LocalDraft, type PageDraft } from "@/lib/editor-draft";
 import { applySourceEdit } from "@/lib/source-edit";
@@ -46,6 +48,9 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
   const loadContentRef = useRef<((source: string) => void) | null>(null);
   const discardedRef = useRef(false);
   const [uploading, setUploading] = useState(false);
+  const [pendingImageBatches, setPendingImageBatches] = useState(0);
+  const [imageUploadError, setImageUploadError] = useState("");
+  const uploadPending = uploading || pendingImageBatches > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function persistDraft() {
@@ -135,6 +140,29 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       });
 
       crepe.editor.config(configureWikiLinkMarkdown);
+      crepe.editor.config(ctx => ctx.update(uploadConfig.key, config => ({
+        ...config,
+        uploadWidgetFactory(pos, spec) {
+          const status = document.createElement("span");
+          status.className = "editor-upload-status";
+          status.setAttribute("role", "status");
+          status.textContent = "이미지 올리는 중…";
+          return Decoration.widget(pos, status, spec);
+        },
+        async uploader(...args) {
+          setImageUploadError("");
+          setPendingImageBatches(n => n + 1);
+          try {
+            return await config.uploader(...args);
+          } catch {
+            if (!destroyed) setImageUploadError("이미지를 올리지 못했습니다. 다시 시도해 주세요.");
+            // Milkdown removes this batch's widget on resolution only.
+            return [];
+          } finally {
+            if (!destroyed) setPendingImageBatches(n => n - 1);
+          }
+        },
+      })));
       await crepe.create();
       if (destroyed) {
         crepe.destroy();
@@ -234,7 +262,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       onSubmit={async (event) => {
         event.preventDefault();
         const editor = crepeRef.current;
-        if (!canEdit || saving || uploading) return;
+        if (!canEdit || saving || uploadPending) return;
         setSaving(true);
         editor?.setReadonly(true);
         setError("");
@@ -277,10 +305,11 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
               else discardDraft();
             }}
           >취소</Link>
-          <button disabled={!canEdit || saving || uploading} className="btn btn-primary">{saving ? "저장 중…" : "저장"}</button>
+          <button disabled={!canEdit || saving || uploadPending} className="btn btn-primary">{saving ? "저장 중…" : "저장"}</button>
         </div>
       </div>
       {error && <div className="notice notice-warn" role="alert">{error}</div>}
+      {imageUploadError && <div className="notice notice-warn" role="alert">{imageUploadError}</div>}
       {storageFailed && <div className="notice notice-warn" role="alert">초안을 이 탭에 보관할 수 없습니다. 이동하기 전에 내용을 복사하세요.</div>}
       {restored && <p className="meta" role="status">이 탭에 보관한 초안을 복원했습니다.</p>}
       {conflictVersion !== undefined && (
@@ -323,7 +352,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
       </div>
       <div className="markdown-tools">
         <MarkdownModeSwitch editing source={showSource} onChange={changeMode}
-          disabled={!draftLoaded || saving || uploading} disableFormatted={!ready} />
+          disabled={!draftLoaded || saving || uploadPending} disableFormatted={!ready} />
       </div>
       {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
         value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploading}
@@ -335,7 +364,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          disabled={!canEdit || saving || uploading}
+          disabled={!canEdit || saving || uploadPending}
           onClick={() => fileInputRef.current?.click()}
         >
           <WikiIcon name="attach" />{uploading ? "올리는 중…" : "파일 첨부"}
