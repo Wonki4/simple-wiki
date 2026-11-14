@@ -2,8 +2,10 @@
 
 import { useState, type MouseEvent } from "react";
 import type { Section } from "@/lib/reading-markup";
+import { MarkdownModeSwitch } from "./MarkdownModeSwitch";
 
-export function WikiArticle({ html, sections }: { html: string; sections: Section[] }) {
+export function WikiArticle({ html, sections, source }: { html: string; sections: Section[]; source: string }) {
+  const [showSource, setShowSource] = useState(false);
   const [feedback, setFeedback] = useState("");
   const topDepth = sections.reduce((depth, section) => Math.min(depth, section.depth), 6);
 
@@ -23,7 +25,18 @@ export function WikiArticle({ html, sections }: { html: string; sections: Sectio
 
   return (
     <>
-      {sections.length > 1 && (
+      <div className="markdown-tools">
+        <MarkdownModeSwitch source={showSource} onChange={setShowSource} />
+        {showSource && <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(source);
+            setFeedback("원문을 복사했습니다.");
+          } catch {
+            setFeedback("원문을 선택해 직접 복사하세요.");
+          }
+        }}>원문 복사</button>}
+      </div>
+      {!showSource && sections.length > 1 && (
         <nav aria-label="문서 목차" className="article-toc">
           <details>
             <summary>목차 <span>{sections.length}</span></summary>
@@ -37,7 +50,9 @@ export function WikiArticle({ html, sections }: { html: string; sections: Sectio
           </details>
         </nav>
       )}
-      <article className="prose-wiki" onClick={copySectionLink} dangerouslySetInnerHTML={{ __html: html }} />
+      {showSource
+        ? <pre className="markdown-source" aria-label="마크다운 원문"><code>{source}</code></pre>
+        : <article className="prose-wiki" onClick={copySectionLink} dangerouslySetInnerHTML={{ __html: html }} />}
       <p className={feedback ? "copy-feedback" : "sr-only"} role="status"
         onAnimationEnd={() => setFeedback("")}>{feedback}</p>
     </>

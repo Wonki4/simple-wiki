@@ -4,7 +4,11 @@ export interface PageDraft {
   expectedVersion?: number;
 }
 
-export function readDraft(key: string): PageDraft | null {
+export interface LocalDraft extends PageDraft {
+  mode?: "block" | "source";
+}
+
+export function readDraft(key: string): LocalDraft | null {
   try {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
@@ -17,7 +21,7 @@ export function readDraft(key: string): PageDraft | null {
   }
 }
 
-export function storeDraft(key: string, draft: PageDraft | null): boolean {
+export function storeDraft(key: string, draft: LocalDraft | null): boolean {
   try {
     if (draft) sessionStorage.setItem(key, JSON.stringify(draft));
     else sessionStorage.removeItem(key);
