@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { Space, SpacePermission } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
+import { effectiveSpaceRole, hasRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
 
 export type SpaceWithPermissions = Space & { permissions: SpacePermission[] };
 
@@ -45,7 +45,7 @@ export async function requireSpaceRole(spaceKey: string, required: SpaceRole) {
     include: { permissions: true },
   });
   if (!space) notFound();
-  const role = resolveSpaceRole(session, space.visibility, space.permissions);
+  const role = effectiveSpaceRole(session, space);
   if (!hasRole(role, required)) {
     // 스페이스 자체를 볼 수 없으면 존재를 숨긴다(404). 볼 수는 있는데 역할이 부족하면 403 성격의 /denied.
     if (role === null) notFound();
@@ -56,8 +56,9 @@ export async function requireSpaceRole(spaceKey: string, required: SpaceRole) {
 
 export async function listReadableSpaces(session: SessionInfo): Promise<SpaceWithPermissions[]> {
   const spaces = await prisma.space.findMany({
+    where: { id: session.tokenScope?.spaceId ?? undefined },
     include: { permissions: true },
     orderBy: { name: "asc" },
   });
-  return spaces.filter((s) => hasRole(resolveSpaceRole(session, s.visibility, s.permissions), "viewer"));
+  return spaces.filter((s) => hasRole(effectiveSpaceRole(session, s), "viewer"));
 }

@@ -42,7 +42,7 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 - 업로드 후 반환된 url을 마크다운으로 본문에 삽입합니다: 이미지는 ![이름](url), 그 외는 [이름](url) (append_to_page/replace_in_page 사용).
 
 규칙:
-- 권한은 토큰 소유자의 스페이스 권한을 따릅니다. 읽을 수 없는 스페이스는 목록·조회 모두 404로 숨겨집니다.
+- list_spaces는 이 토큰으로 접근 가능한 스페이스와 실제 역할을 반환합니다. 읽기 전용 토큰의 역할은 viewer이며 문서 변경·첨부 업로드는 403입니다. 범위 밖 스페이스는 목록과 검색에서 제외되며 직접 조회하면 404입니다.
 - 문서 사이 링크는 위키링크 문법 [[문서 제목]]을 씁니다.
 - delete_page는 문서를 휴지통으로 옮기므로 사용자가 명시적으로 요청할 때만 사용합니다.`;
 
@@ -168,7 +168,7 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
     {
       title: "스페이스 목록",
       description:
-        "토큰 사용자가 읽을 수 있는 위키 스페이스 목록과 각 스페이스에서의 역할(viewer/editor/admin)을 반환합니다.",
+        "이 토큰으로 읽을 수 있는 위키 스페이스 목록과 각 스페이스에서의 역할(viewer/editor/admin)을 반환합니다.",
       inputSchema: {},
     },
     async () => toResult(await api("/api/spaces")),

@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/access";
+import { listReadableSpaces, requireSession } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { revokeApiToken } from "@/actions/tokens";
 import { CreateTokenForm } from "@/components/CreateTokenForm";
@@ -6,26 +6,26 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 export default async function TokensPage() {
   const session = await requireSession();
-  const tokens = await prisma.apiToken.findMany({
-    where: { userId: session.userId },
-    orderBy: { createdAt: "desc" },
-  });
+  const [tokens, spaces] = await Promise.all([
+    prisma.apiToken.findMany({ where: { userId: session.userId }, orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, prefix: true, lastUsedAt: true, createdAt: true, readOnly: true, spaceId: true } }),
+    listReadableSpaces(session),
+  ]);
+  const spaceNames = new Map(spaces.map(space => [space.id, space.name]));
 
   return (
     <main className="wrap py-10">
       <p className="eyebrow">settings · api</p>
       <h1 className="page-title mt-1">개인 액세스 토큰</h1>
       <p className="muted mt-2 max-w-2xl text-sm">
-        MCP 서버 등 프로그램에서 API를 호출할 때 쓰는 토큰입니다. 토큰은 발급한 사용자의
-        스페이스 권한을 그대로 상속하며, 읽기 API 호출 시{" "}
-        <code style={{ fontFamily: "var(--font-mono)" }}>Authorization: Bearer &lt;토큰&gt;</code>{" "}
-        헤더로 전달합니다.
+        MCP와 API에서 사용할 토큰입니다. 읽기 전용이나 특정 스페이스로 제한할 수 있습니다.
+        읽기·쓰기를 선택해도 문서를 수정하려면 해당 스페이스의 편집 권한이 필요합니다.
       </p>
 
       <section className="mt-8">
         <h2 className="section-title">새 토큰 발급</h2>
         <div className="mt-3">
-          <CreateTokenForm />
+          <CreateTokenForm spaces={spaces.map(({ id, key, name }) => ({ id, key, name }))} />
         </div>
       </section>
 
@@ -36,6 +36,8 @@ export default async function TokensPage() {
             <thead>
               <tr>
                 <th>이름</th>
+                <th>권한</th>
+                <th>스페이스</th>
                 <th>접두사</th>
                 <th>마지막 사용</th>
                 <th>발급일</th>
@@ -46,6 +48,8 @@ export default async function TokensPage() {
               {tokens.map((t) => (
                 <tr key={t.id}>
                   <td>{t.name}</td>
+                  <td>{t.readOnly ? "읽기 전용" : "읽기·쓰기"}</td>
+                  <td>{t.spaceId ? spaceNames.get(t.spaceId) ?? "접근 권한 없음" : "전체"}</td>
                   <td>
                     <span className="key">{t.prefix}…</span>
                   </td>
@@ -65,7 +69,7 @@ export default async function TokensPage() {
               ))}
               {tokens.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="muted">발급된 토큰이 없습니다.</td>
+                  <td colSpan={7} className="muted">발급된 토큰이 없습니다.</td>
                 </tr>
               )}
             </tbody>

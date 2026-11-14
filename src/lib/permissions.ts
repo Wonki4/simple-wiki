@@ -6,6 +6,7 @@ export interface SessionInfo {
   /** 내가 속한 WikiGroup id 목록 (요청 시 DB 조회 — 클레임 스냅샷 아님) */
   groups: string[];
   isWikiAdmin: boolean;
+  tokenScope?: { readOnly: boolean; spaceId: string | null };
 }
 
 export interface PermissionEntry {
@@ -37,4 +38,14 @@ export function resolveSpaceRole(
 
 export function hasRole(actual: SpaceRole | null, required: SpaceRole): boolean {
   return actual !== null && LEVEL[actual] >= LEVEL[required];
+}
+
+// 토큰 범위는 발급자에게 현재 허용된 권한을 좁힐 수만 있다.
+export function effectiveSpaceRole(session: SessionInfo, space: {
+  id: string; visibility: SpaceVisibility; permissions: PermissionEntry[];
+}): SpaceRole | null {
+  const scope = session.tokenScope;
+  if (scope?.spaceId != null && scope.spaceId !== space.id) return null;
+  const role = resolveSpaceRole(session, space.visibility, space.permissions);
+  return role && scope?.readOnly ? "viewer" : role;
 }

@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import type { Space, SpacePermission } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, getWikiGroupIds } from "@/lib/access";
-import { hasRole, resolveSpaceRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
+import { effectiveSpaceRole, hasRole, type SessionInfo, type SpaceRole } from "@/lib/permissions";
 import { checkTokenRateLimit } from "@/lib/rate-limit";
 
 const TOKEN_PREFIX = "swk_";
@@ -49,6 +49,7 @@ export async function resolveApiActor(req: NextRequest): Promise<ApiActor | null
         via: "token",
         tokenName: token.name,
         tokenId: token.id,
+        tokenScope: { readOnly: token.readOnly, spaceId: token.spaceId },
       };
     }
     return null;
@@ -109,7 +110,7 @@ export async function requireApiSpaceRole(
   if (!space) {
     return { ok: false, response: Response.json({ error: "스페이스가 없습니다." }, { status: 404 }) };
   }
-  const role = resolveSpaceRole(actor, space.visibility, space.permissions);
+  const role = effectiveSpaceRole(actor, space);
   if (role === null) {
     return { ok: false, response: Response.json({ error: "스페이스가 없습니다." }, { status: 404 }) };
   }

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { resolveApiActor, rateLimitResponse } from "@/lib/api-auth";
 import { listReadableSpaces } from "@/lib/access";
-import { resolveSpaceRole } from "@/lib/permissions";
+import { effectiveSpaceRole } from "@/lib/permissions";
 
 // GET /api/spaces — 읽기 권한이 있는 스페이스 목록
 export async function GET(req: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       name: s.name,
       description: s.description,
       visibility: s.visibility,
-      role: resolveSpaceRole(actor, s.visibility, s.permissions),
+      role: effectiveSpaceRole(actor, s),
     })),
   });
 }
