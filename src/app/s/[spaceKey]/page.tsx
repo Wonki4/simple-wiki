@@ -8,7 +8,7 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
   const { spaceKey } = await params;
   const { space, role } = await requireSpaceRole(spaceKey, "viewer");
   const pages = await prisma.page.findMany({
-    where: { spaceId: space.id },
+    where: { spaceId: space.id, deletedAt: null },
     orderBy: [{ updatedAt: "desc" }, { title: "asc" }],
     select: { id: true, slug: true, title: true, updatedAt: true },
   });
@@ -19,7 +19,10 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
         <h1 className="document-title">{space.name}</h1>
         {space.description && <p>{space.description}</p>}
       </header>
-      <h2 className="collection-label">최근 수정한 문서</h2>
+      <div className="collection-label flex items-center justify-between gap-3">
+        <h2>최근 수정한 문서</h2>
+        {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
+      </div>
       {pages.length > 0 ? (
         <ul className="recent-list">
           {pages.map((p) => (

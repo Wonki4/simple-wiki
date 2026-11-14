@@ -9,7 +9,7 @@ export default async function EditPagePage({ params }: { params: Promise<{ space
   const slug = decodeURIComponent(rawSlug);
   const { space, session } = await requireSpaceRole(spaceKey, "editor");
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
     select: { id: true, title: true, content: true, version: true },
   });
   if (!page) notFound();

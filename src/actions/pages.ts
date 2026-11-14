@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, requireSpaceRole } from "@/lib/access";
-import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace, deletePageInSpace } from "@/lib/pages";
+import { createPageInSpace, updatePageInSpace, revertPage, movePageInSpace } from "@/lib/pages";
 import type { PageDraft } from "@/lib/editor-draft";
+import { deletePageInSpace, restoreTrashedPage } from "@/lib/page-trash";
 import { PageConflictError } from "@/lib/page-edits";
 
 export type SaveResult =
@@ -23,7 +24,7 @@ export async function createPage(spaceKey: string, parentSlug: string | null, dr
   let parentId: string | null = null;
   if (parentSlug) {
     const parent = await prisma.page.findUnique({
-      where: { spaceId_slug: { spaceId: space.id, slug: parentSlug } },
+      where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug: parentSlug } },
       select: { id: true },
     });
     // 부모가 그사이 삭제된 경우 — 조용히 최상위로 만들지 않고 명시적으로 알린다.
@@ -101,9 +102,9 @@ export async function movePage(spaceKey: string, slug: string, formData: FormDat
 }
 
 export async function deletePage(spaceKey: string, slug: string) {
-  const { space } = await requireSpaceRole(spaceKey, "editor");
-  await deletePageInSpace({ spaceId: space.id, slug });
-  revalidatePath(`/s/${spaceKey}`);
+  const { space, session } = await requireSpaceRole(spaceKey, "editor");
+  await deletePageInSpace(space.id, slug, session.userId);
+  revalidatePath(`/s/${spaceKey}`, "layout");
   redirect(`/s/${spaceKey}`);
 }
 
@@ -121,4 +122,14 @@ export async function restoreRevision(spaceKey: string, slug: string, version: n
   revalidatePath(`/s/${spaceKey}`);
   revalidatePath(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
   redirect(`/s/${spaceKey}/${encodeURIComponent(slug)}`);
+}
+
+export async function restoreFromTrash(spaceKey: string, id: string, form: FormData) {
+  const { space } = await requireSpaceRole(spaceKey, "editor");
+  const result = await restoreTrashedPage(space.id, id, String(form.get("slug") ?? ""));
+  if (result.status === "restored") {
+    revalidatePath(`/s/${spaceKey}`, "layout");
+    redirect(`/s/${spaceKey}/${encodeURIComponent(result.slug)}`);
+  }
+  redirect(`/s/${spaceKey}/-/trash?item=${encodeURIComponent(id)}&error=${result.status}`);
 }

@@ -8,7 +8,7 @@ import { requireSpaceRole } from "@/lib/access";
 export async function toggleLike(spaceKey: string, slug: string) {
   const { session, space } = await requireSpaceRole(spaceKey, "viewer");
   const page = await prisma.page.findUnique({
-    where: { spaceId_slug: { spaceId: space.id, slug } },
+    where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
     select: { id: true },
   });
   if (!page) return;

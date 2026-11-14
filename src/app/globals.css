@@ -1145,3 +1145,22 @@ mark {
   width: max-content; max-width: 90vw; padding: .65rem 1rem; border-radius: var(--radius);
   color: var(--primary-ink); background: var(--primary); box-shadow: var(--shadow); animation: dismiss-copy 3s forwards; }
 @keyframes dismiss-copy { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.trash-list > li { padding-block: 1rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.trash-list form, .diff-picker { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+.trash-list .notice { flex-basis: 100%; }
+.diff-picker { margin-block: 1.25rem; }
+.diff-picker select { border: 1px solid var(--border-strong); border-radius: .4rem; padding: .32rem; background: var(--surface); color: var(--ink); }
+.revision-diff { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-block: 1.25rem; }
+.revision-diff h2, .revision-diff p, .revision-diff summary { padding: .45rem .8rem; }
+.revision-diff summary { cursor: pointer; color: var(--muted); }
+.revision-diff pre { padding: .25rem .8rem; font: .83rem/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-titles span { color: var(--muted); }
+.diff-add { background: color-mix(in srgb, #29a35a 14%, var(--surface)); }
+.diff-remove { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
+
+.search-scope, .search-pagination { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.search-scope { margin-bottom: 1.25rem; font-size: .9rem; }
+.search-scope select { max-width: 100%; min-width: 0; padding: .35rem; border: 1px solid var(--border-strong); border-radius: .4rem; color: var(--ink); background: var(--surface); }
+.search-pagination { justify-content: center; margin-top: 1.5rem; font-size: .9rem; color: var(--muted); }
+.search-pagination a { padding: .5rem .75rem; color: var(--link); }

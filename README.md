@@ -7,8 +7,9 @@
 
 - **스페이스 + 권한** — 문서를 스페이스로 묶고, `viewer < editor < admin` 3단계 권한을 Keycloak 그룹/개별 사용자에게 부여. 스페이스는 전사 공개(organization) 또는 제한(restricted).
 - **블록·원문 편집** — [Milkdown](https://milkdown.dev) 블록 편집기와 마크다운 원문 입력창을 전환할 수 있습니다. 원문에서 한 줄만 고치면 나머지 공백과 줄바꿈은 그대로 저장됩니다. 현재 문서와 이전 버전의 읽기 화면에서도 원문을 보고 복사할 수 있습니다.
-- **전문 검색** — PostgreSQL `tsvector` + `pg_trgm`. **읽을 수 있는 스페이스만** 검색됨(권한 격리). 헤더 검색창(`⌘K`).
-- **버전 이력** — 저장할 때마다 리비전 스냅샷. 이전 버전 보기·복원.
+- **전문 검색** — PostgreSQL `tsvector` + `pg_trgm`. **읽을 수 있는 스페이스만** 검색됨(권한 격리). 스페이스 안의 헤더 검색창(`⌘K`)은 해당 스페이스에서 시작합니다. 결과 화면에서 범위를 바꾸고 20건씩 이동합니다.
+- **버전 이력** — 저장할 때마다 리비전 스냅샷. 이전 버전 보기·복원 및 두 버전의 제목·마크다운 줄 단위 비교.
+- **문서 휴지통** — 스페이스 편집자는 삭제한 문서를 이력·댓글·좋아요와 함께 복원할 수 있습니다. 하위 문서는 가까운 상위 문서에 계속 표시되고, 원래 주소를 다른 문서가 사용하면 복원 주소를 선택할 수 있습니다.
 - **위키링크 `[[페이지명]]`** — 현재 제목과 이전 제목으로 같은 문서를 연결하며, 본문에 실제 링크가 있는 문서만 백링크에 표시. 없는 문서는 red link.
 - **문서 읽기** — 소제목이 둘 이상이면 목차를 제공. 소제목 옆 `#`으로 해당 절의 주소를 복사하고, 본문 이미지를 눌러 원본을 새 탭에서 열 수 있음.
 - **첨부파일** — 이미지 붙여넣기/드래그 업로드. 스페이스 권한으로 접근 통제, SVG는 첨부(attachment)로 강제 다운로드.
@@ -65,7 +66,7 @@ Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
 - **REST API**: `Authorization: Bearer swk_...`
   - `GET /api/spaces` · `GET /api/spaces/{key}/pages` · `GET /api/spaces/{key}/pages/{slug}`
   - `POST /api/spaces/{key}/pages` · `PUT .../{slug}` · `DELETE .../{slug}` (editor)
-  - `GET /api/search?q=` (읽을 수 있는 스페이스만)
+  - `GET /api/search?q=배포&space=eng&page=2` — `space` 생략 시 읽을 수 있는 전체 스페이스. 페이지당 50건이며 `results`와 함께 `page`, `pageSize`, `total`, `totalPages`를 반환합니다. 범위를 넘긴 페이지는 마지막 페이지로 맞춥니다.
 - **MCP 서버**: `list_spaces`·`list_pages`·`search_pages`·`get_page`·`create_page`·`update_page`·`delete_page` 도구 제공.
   로컬(stdio) / 원격(streamable-http) 모두 지원. 설치·등록은 [`mcp-server/README.md`](mcp-server/README.md).
 
