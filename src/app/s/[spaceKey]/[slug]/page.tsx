@@ -131,7 +131,7 @@ export default async function PageView({
           <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
         </p>
       </header>
-      <WikiArticle {...article} />
+      <WikiArticle {...article} source={page.content} />
       <div className="document-reactions">
         <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>

@@ -54,7 +54,7 @@ export default async function RevisionPage({
           )}
         </div>
       </div>
-      <div className="mt-7"><WikiArticle {...article} /></div>
+      <div className="mt-7"><WikiArticle {...article} source={rev.content} /></div>
     </main>
   );
 }

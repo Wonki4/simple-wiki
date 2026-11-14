@@ -1121,6 +1121,14 @@ mark {
   .wysiwyg .milkdown .ProseMirror { min-height: 12rem; }
 }
 
+.markdown-tools { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.1rem; }
+.markdown-mode { display: inline-flex; gap: .15rem; padding: .2rem; background: var(--surface-2); border-radius: var(--radius); }
+.markdown-mode button { padding: .35rem .8rem; border: 1px solid transparent; border-radius: calc(var(--radius) - 2px); font-size: .85rem; color: var(--muted); }
+.markdown-mode button[aria-pressed="true"] { background: var(--surface); color: var(--ink); border-color: var(--border); font-weight: 650; }
+.markdown-mode button:disabled { opacity: .6; }
+.markdown-source { display: block; width: 100%; min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink); font: .9rem/1.7 var(--font-mono); tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.source-input { min-height: 18rem; height: 48vh; resize: vertical; }
 .article-toc { max-width: 44rem; margin-block: 0 1.6rem; border-block: 1px solid var(--border); }
 .article-toc summary { cursor: pointer; padding-block: .7rem; font-weight: 650; color: var(--ink-2); }
 .article-toc summary span { margin-left: .3rem; color: var(--muted); font-size: .8rem; }
