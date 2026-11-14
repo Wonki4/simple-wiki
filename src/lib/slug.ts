@@ -5,3 +5,7 @@ export function slugify(title: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+export function sectionId(title: string) {
+  return `section-${slugify(title) || "heading"}`;
+}

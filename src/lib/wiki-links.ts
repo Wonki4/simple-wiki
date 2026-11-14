@@ -3,7 +3,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import type { Root, PhrasingContent } from "mdast";
-import { slugify } from "./slug";
+import { sectionId, slugify } from "./slug";
 
 const parser = unified().use(remarkParse).use(remarkGfm);
 const wikiLinkPattern = /\[\[([^\[\]|\r\n]+)(?:\|([^\[\]\r\n]+))?\]\]/g;
@@ -12,6 +12,16 @@ export interface WikiLink {
   target: string;
   label: string;
   slug: string;
+  space?: string;
+  section?: string;
+}
+
+export function splitWikiTarget(target: string) {
+  const scope = /^([a-z0-9][a-z0-9-]{1,31}):/.exec(target);
+  const rest = target.slice(scope?.[0].length ?? 0);
+  const hash = rest.indexOf("#");
+  return { space: scope?.[1], name: (hash < 0 ? rest : rest.slice(0, hash)).trim(),
+    section: hash < 0 ? undefined : rest.slice(hash + 1).trim() };
 }
 
 // 렌더링과 백링크 색인이 같은 텍스트 노드를 해석한다. 기존 링크 안에는 링크를 중첩하지 않는다.
@@ -23,9 +33,11 @@ function walkWikiLinks(tree: Root, onLink: (link: WikiLink) => PhrasingContent |
     let end = 0;
     for (const match of node.value.matchAll(wikiLinkPattern)) {
       const target = match[1].trim();
-      const slug = slugify(target);
-      if (!slug) continue;
-      const link = onLink({ target, slug, label: (match[2] ?? target).trim() });
+      const { space, name, section } = splitWikiTarget(target);
+      const slug = slugify(name);
+      if (!slug && !(section && !space && !name)) continue;
+      const link = onLink({ target, slug, label: (match[2] ?? target).trim(),
+        ...(space && { space }), ...(section !== undefined && { section }) });
       if (!link) continue;
       if (end < match.index) children.push({ type: "text", value: node.value.slice(end, match.index) });
       children.push(link);
@@ -41,7 +53,8 @@ function walkWikiLinks(tree: Root, onLink: (link: WikiLink) => PhrasingContent |
 export function extractWikiLinks(markdown: string): WikiLink[] {
   const links = new Map<string, WikiLink>();
   walkWikiLinks(parser.parse(markdown), (link) => {
-    if (!links.has(link.slug)) links.set(link.slug, link);
+    const key = JSON.stringify([link.space, link.slug, link.section === undefined ? null : link.target]);
+    if (!links.has(key)) links.set(key, link);
   });
   return [...links.values()];
 }
@@ -49,18 +62,25 @@ export function extractWikiLinks(markdown: string): WikiLink[] {
 export interface WikiLinkOptions {
   spaceKey: string;
   destinations: Map<string, string>;
+  otherSpaces?: Map<string, Map<string, string>>;
 }
 
-export function remarkWikiLinks({ spaceKey, destinations }: WikiLinkOptions) {
-  return (tree: Root) => walkWikiLinks(tree, ({ slug, target, label }) => {
-    const destination = destinations.get(slug);
+export function remarkWikiLinks({ spaceKey, destinations, otherSpaces }: WikiLinkOptions) {
+  return (tree: Root) => walkWikiLinks(tree, ({ slug, target, label, space, section }) => {
+    // Preserve links to existing local titles containing '#' or ':'.
+    const literal = slug && (space || section !== undefined) && destinations.get(slugify(target));
+    const key = literal ? spaceKey : space ?? spaceKey;
+    const names = key === spaceKey ? destinations : otherSpaces?.get(key);
+    const destination = literal || names?.get(slug);
+    const fragment = section && !literal ? `#${encodeURIComponent(sectionId(section))}` : "";
+    const children = [{ type: "text" as const, value: label }];
+    if (!names || (space && !destination)) return children[0];
+    const href = destination ? `/s/${key}/${encodeURIComponent(destination)}${fragment}` : !slug && fragment ? fragment : null;
     return {
       type: "link",
-      url: destination
-        ? `/s/${spaceKey}/${encodeURIComponent(destination)}`
-        : `/s/${spaceKey}/new?title=${encodeURIComponent(target)}`,
-      data: { hProperties: { className: destination ? ["wiki-link"] : ["wiki-link", "wiki-link-missing"] } },
-      children: [{ type: "text", value: label }],
+      url: href ?? `/s/${spaceKey}/new?title=${encodeURIComponent(splitWikiTarget(target).name)}`,
+      data: { hProperties: { className: href ? ["wiki-link"] : ["wiki-link", "wiki-link-missing"] } },
+      children,
     };
   });
 }

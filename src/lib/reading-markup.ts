@@ -1,6 +1,6 @@
 import type { Element, ElementContent, Root } from "hast";
 import { SKIP, visit } from "unist-util-visit";
-import { slugify } from "./slug";
+import { sectionId } from "./slug";
 
 export interface Section {
   id: string;
@@ -36,7 +36,7 @@ export function readingMarkup(sections: Section[]) {
       if (!/^h[1-6]$/.test(node.tagName) || node.properties.id) return;
       const title = headingText(node).trim();
       if (!title) return;
-      const base = `section-${slugify(title) || "heading"}`;
+      const base = sectionId(title);
       let id = base;
       for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
       used.add(id);

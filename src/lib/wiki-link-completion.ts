@@ -34,12 +34,13 @@ export function matchingPages(pages: readonly LinkPage[], query: string): LinkPa
   return [...prefix, ...partial].slice(0, 8);
 }
 
-export function completedLink(page: LinkPage, label?: string) {
-  const target = slugify(page.title) === page.slug && !/[\[\]|\r\n]/.test(page.title) ? page.title : page.slug;
+export function completedLink(page: LinkPage, label?: string, space?: string) {
+  const target = slugify(page.title) === page.slug && !/[\[\]|#:\r\n]/.test(page.title) ? page.title : page.slug;
   const display = label ?? (target === page.title ? null : page.title);
-  const candidate = display ? `[[${target}|${display}]]` : `[[${target}]]`;
+  const prefix = space ? `${space}:` : "";
+  const candidate = display ? `[[${prefix}${target}|${display}]]` : `[[${prefix}${target}]]`;
   // Some titles (e.g. inline code) cannot be represented inside a Markdown text node.
   const [parsed] = extractWikiLinks(candidate);
-  if (parsed?.slug === page.slug && parsed.label === (display ?? target)) return candidate;
-  return label ? `[[${page.slug}|${label}]]` : `[[${page.slug}]]`;
+  if (parsed?.slug === page.slug && parsed.label === (display ?? prefix + target)) return candidate;
+  return label ? `[[${prefix}${page.slug}|${label}]]` : `[[${prefix}${page.slug}]]`;
 }

@@ -52,3 +52,15 @@ it("코드와 마크다운 링크 레이블 속 위키 문법은 본문 링크�
   expect(html.match(/class="wiki-link"/g)).toHaveLength(1);
   expect(html).toContain('href="/guide"><strong>[[문서]]</strong>');
 });
+
+it("소제목·중복 제목 앵커와 공간별 링크를 렌더링하고 접근 불가한 대상은 본문 라벨만 표시한다", async () => {
+  const content = "## Setup\n\n## Setup\n\n[[#Setup-2]] [[Guide#Setup]] [[eng:Old#Setup|절차]] [[eng:unknown|기타]] [[restricted:hidden|참고]]";
+  const { html } = await renderMarkdown(content, { spaceKey: "notice", destinations: new Map([["guide", "guide"]]),
+    otherSpaces: new Map([["eng", new Map([["old", "stable"]])]]) });
+  expect(html).toContain('id="section-setup-2"');
+  expect(html).toContain('href="#section-setup-2"');
+  expect(html).toContain('href="/s/notice/guide#section-setup"');
+  expect(html).toContain('href="/s/eng/stable#section-setup"');
+  expect(html).toContain("참고");
+  expect(html).not.toMatch(/restricted|unknown|\/new\?/);
+});

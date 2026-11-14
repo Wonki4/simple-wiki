@@ -346,7 +346,8 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
           {showPreview ? "미리보기 닫기" : "미리보기 열기"}
         </button>}
       </div>
-      <WikiLinkCompletion readTarget={readLinkTarget}>
+      <WikiLinkCompletion spaceKey={spaceKey} readTarget={readLinkTarget}
+        readMarkdown={() => showSource ? draftRef.current.content : readContentRef.current?.() ?? draftRef.current.content}>
         {showSource && <textarea ref={textareaRef} aria-label="마크다운 원문" className="markdown-source source-input"
           value={sourceText} onChange={event => editSource(event.target.value)} readOnly={saving || uploadPending}
           placeholder="마크다운 원문을 입력하세요." spellCheck={false} />}
@@ -364,7 +365,7 @@ export function MarkdownEditor({ draftKey, spaceKey, spaceName, cancelHref, init
           <WikiIcon name="attach" />{uploadPending ? "올리는 중…" : "파일 첨부"}
         </button>
         <p className="meta">
-          {showSource ? "파일을 첨부하면 커서 위치에 마크다운 링크가 들어갑니다." : "이미지는 끌어다 놓고, 문서는 [[제목]]으로 연결하세요."}
+          {showSource ? "파일을 첨부하면 커서 위치에 마크다운 링크가 들어갑니다." : "문서의 절은 [[문서#소제목]], 다른 스페이스는 [[키:문서]]로 연결하세요."}
         </p>
         {failures.length > 0 && (
           <ul className="upload-failures" aria-label="업로드 실패 목록">

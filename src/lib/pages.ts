@@ -17,11 +17,18 @@ import {
 async function syncLinks(tx: Prisma.TransactionClient, pageId: string, spaceId: string, content: string) {
   await tx.pageLink.deleteMany({ where: { fromPageId: pageId } });
   const links = extractWikiLinks(content);
-  if (links.length > 0) {
-    await tx.pageLink.createMany({
-      data: links.map((l) => ({ fromPageId: pageId, toSpaceId: spaceId, toSlug: l.slug })),
-    });
-  }
+  const keys = [...new Set(links.flatMap(link => link.space ? [link.space] : []))];
+  const spaces = keys.length ? await tx.space.findMany({ where: { key: { in: keys } }, select: { id: true, key: true } }) : [];
+  const spaceIds = new Map(spaces.map(s => [s.key, s.id]));
+  const rows = links.flatMap(link => {
+    if (!link.slug) return [];
+    const toSpaceId = link.space ? spaceIds.get(link.space) : spaceId;
+    const rows = toSpaceId ? [{ fromPageId: pageId, toSpaceId, toSlug: link.slug }] : [];
+    // 기존 문서의 ':'와 '#'가 포함된 제목도 백링크 후보로 남긴다.
+    if (link.space || link.section !== undefined) rows.push({ fromPageId: pageId, toSpaceId: spaceId, toSlug: slugify(link.target) });
+    return rows;
+  });
+  if (rows.length) await tx.pageLink.createMany({ data: rows, skipDuplicates: true });
 }
 
 // 페이지 본문 교체를 한 트랜잭션으로 커밋한다: Page 갱신 + 새 리비전 + 링크 동기화.
