@@ -19,11 +19,12 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
         <h1 className="document-title">{space.name}</h1>
         {space.description && <p>{space.description}</p>}
       </header>
-      <div className="collection-label flex items-center justify-between gap-3">
+      <div className="collection-label flex flex-wrap items-center justify-between gap-3">
         <h2>최근 수정한 문서</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/attachments`}><WikiIcon name="attach" />첨부파일</Link>
           {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
+          <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/orphan-pages`}>고아 문서</Link>
         </div>
       </div>
       {pages.length > 0 ? (
