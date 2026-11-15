@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractWikiLinks, remarkWikiLinks } from "@/lib/wiki-links";
+import { extractWikiLinks, remarkWikiLinks, resolveWikiLink } from "@/lib/wiki-links";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
@@ -63,5 +63,29 @@ it("다른 스페이스와 문서·소제목·별칭을 분리하고 코드 예�
   const links = extractWikiLinks("[[eng:배포 가이드#설치|절차]] [[#설치]] [[로컬#설치]] `[[secret:private]]`");
   expect(links.map(({ space, slug, section, label }) => [space, slug, section, label])).toEqual([
     ["eng", "배포-가이드", "설치", "절차"], [undefined, "", "설치", "#설치"], [undefined, "로컬", "설치", "로컬#설치"],
+  ]);
+});
+
+it("깨진 링크 검사에서도 구분자가 포함된 기존 제목과 이전 이름을 실제 주소로 해석한다", () => {
+  const options = {
+    spaceKey: "notice",
+    destinations: new Map([["eng-배포-절차", "legacy"], ["이전-제목", "guide"]]),
+    otherSpaces: new Map([["eng", new Map([["배포", "deploy"]])]]),
+  };
+  const links = extractWikiLinks("[[eng:배포#절차]] [[이전 제목#설치]] [[#시작]]");
+  expect(links.map(link => resolveWikiLink(link, options))).toEqual([
+    { kind: "page", spaceKey: "notice", slug: "legacy" },
+    { kind: "page", spaceKey: "notice", slug: "guide", section: "설치" },
+    { kind: "page", spaceKey: "notice", slug: "", section: "시작" },
+  ]);
+});
+
+it("읽을 수 있는 대상이 누락된 경우와 접근할 수 없는 스페이스를 구분한다", () => {
+  const options = { spaceKey: "notice", destinations: new Map(), otherSpaces: new Map([["eng", new Map()]]) };
+  const links = extractWikiLinks("[[문서#절|별칭]] [[eng:문서#절]] [[hidden:문서]]");
+  expect(links.map(link => resolveWikiLink(link, options))).toEqual([
+    { kind: "missing", spaceKey: "notice", title: "문서" },
+    { kind: "missing", spaceKey: "eng", title: "문서" },
+    null,
   ]);
 });
