@@ -25,6 +25,7 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
           <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/attachments`}><WikiIcon name="attach" />첨부파일</Link>
           <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/broken-links`}>깨진 위키링크</Link>
           {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
+          <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/orphan-pages`}>고아 문서</Link>
         </div>
       </div>
       {pages.length > 0 ? (
