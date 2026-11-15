@@ -65,22 +65,42 @@ export interface WikiLinkOptions {
   otherSpaces?: Map<string, Map<string, string>>;
 }
 
-export function remarkWikiLinks({ spaceKey, destinations, otherSpaces }: WikiLinkOptions) {
-  return (tree: Root) => walkWikiLinks(tree, ({ slug, target, label, space, section }) => {
-    // Preserve links to existing local titles containing '#' or ':'.
-    const literal = slug && (space || section !== undefined) && destinations.get(slugify(target));
-    const key = literal ? spaceKey : space ?? spaceKey;
-    const names = key === spaceKey ? destinations : otherSpaces?.get(key);
-    const destination = literal || names?.get(slug);
-    const fragment = section && !literal ? `#${encodeURIComponent(sectionId(section))}` : "";
-    const children = [{ type: "text" as const, value: label }];
-    if (!names || (space && !destination)) return children[0];
-    const href = destination ? `/s/${key}/${encodeURIComponent(destination)}${fragment}` : !slug && fragment ? fragment : null;
+type ResolvedWikiLink =
+  | { kind: "missing"; spaceKey: string; title: string }
+  | { kind: "page"; spaceKey: string; slug: string; section?: string };
+
+// 빈 slug는 현재 문서, null은 열람 범위 밖의 스페이스다.
+export function resolveWikiLink(link: WikiLink, options: WikiLinkOptions): ResolvedWikiLink | null {
+  // ':'와 '#'가 들어간 기존 로컬 문서의 제목을 먼저 확인한다.
+  if (link.slug && (link.space || link.section !== undefined)) {
+    const literal = options.destinations.get(slugify(link.target));
+    if (literal) return { kind: "page", spaceKey: options.spaceKey, slug: literal };
+  }
+
+  const spaceKey = link.space ?? options.spaceKey;
+  const names = spaceKey === options.spaceKey ? options.destinations : options.otherSpaces?.get(spaceKey);
+  if (!names) return null;
+  const slug = link.slug ? names.get(link.slug) : "";
+  return slug === undefined
+    ? { kind: "missing", spaceKey, title: splitWikiTarget(link.target).name }
+    : { kind: "page", spaceKey, slug, section: link.section };
+}
+
+export function remarkWikiLinks(options: WikiLinkOptions) {
+  return (tree: Root) => walkWikiLinks(tree, link => {
+    const target = resolveWikiLink(link, options);
+    const text = { type: "text" as const, value: link.label };
+    if (!target || (link.space && target.kind === "missing")) return text;
+
+    const home = `/s/${target.spaceKey}`;
+    if (target.kind === "missing") return {
+      type: "link", url: `${home}/new?title=${encodeURIComponent(target.title)}`,
+      data: { hProperties: { className: ["wiki-link", "wiki-link-missing"] } }, children: [text],
+    };
+    const fragment = target.section ? `#${encodeURIComponent(sectionId(target.section))}` : "";
     return {
-      type: "link",
-      url: href ?? `/s/${spaceKey}/new?title=${encodeURIComponent(splitWikiTarget(target).name)}`,
-      data: { hProperties: { className: href ? ["wiki-link"] : ["wiki-link", "wiki-link-missing"] } },
-      children,
+      type: "link", url: (target.slug ? `${home}/${encodeURIComponent(target.slug)}` : "") + fragment,
+      data: { hProperties: { className: ["wiki-link"] } }, children: [text],
     };
   });
 }

@@ -1077,6 +1077,11 @@ mark {
 .collection-heading { margin: 1.4rem 0 2.6rem; }
 .collection-heading p { color: var(--muted); margin-top: .75rem; }
 .collection-label { color: var(--ink); font-size: .94rem; font-weight: 650; padding-bottom: .8rem; border-bottom: 1px solid var(--border-strong); }
+.broken-links-group { padding-block: 1.25rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.broken-links-group header, .broken-links-group li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .4rem 1rem; }
+.broken-links-group h3 { font-weight: 650; }
+.broken-links-group li { margin-top: .85rem; }
+.broken-links-group code { font-family: var(--font-mono); font-size: .87rem; }
 .recent-list li, .results-list li { border-bottom: 1px solid var(--border); }
 .recent-list a { display: flex; align-items: center; gap: .8rem; min-height: 3.6rem; padding: .65rem .1rem; color: var(--ink); }
 .recent-list a:hover, .results-list a:hover { color: var(--accent); }
