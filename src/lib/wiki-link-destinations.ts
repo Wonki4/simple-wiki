@@ -1,5 +1,6 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { prisma } from "./db";
+import { documentUrl, linkedPageSlugs } from "./document-links";
 import { slugify } from "./slug";
 import { extractWikiLinks } from "./wiki-links";
 
@@ -58,17 +59,33 @@ export function linkedSpaces(content: string, currentKey: string, readable: Link
   return readable.filter(s => s.key !== currentKey && keys.has(s.key));
 }
 
-export async function getBacklinks(space: LinkSpace, slug: string, readable: LinkSpace[]) {
+const backlinksTag = "document-backlinks";
+
+export function invalidateBacklinks() {
+  revalidateTag(backlinksTag);
+}
+
+const findBacklinks = unstable_cache(async (space: LinkSpace, slug: string, readableIds: string[]) => {
   const destinations = await getWikiDestinations(space.id);
   const keys = [...destinations].filter(([, target]) => target === slug).map(([key]) => key);
   const candidates = await prisma.page.findMany({
     where: {
-      spaceId: { in: readable.map(s => s.id) }, deletedAt: null,
+      spaceId: { in: readableIds }, deletedAt: null,
+      NOT: { spaceId: space.id, slug },
       OR: [
         { linksFrom: { some: { toSpaceId: space.id, toSlug: { in: keys } } } },
         // Also find links written before scoped targets and sections were indexed.
         { content: { contains: `${space.key}:` } },
         { spaceId: space.id, AND: [{ content: { contains: "[[" } }, { content: { contains: "#" } }] },
+        // 일반 링크는 PageLink 색인이 없다. URL에 slug가 그대로 있거나 일부 문자가
+        // 퍼센트 인코딩, HTML 문자 참조, 이스케이프된 하이픈으로 적힌 본문만 후보로 둔다.
+        { AND: [
+          { OR: [{ content: { contains: "[" } }, { content: { contains: "/" } }] },
+          { OR: [
+            { content: { contains: slug } }, { content: { contains: "\\%" } },
+            { content: { contains: "&" } }, { content: { contains: "\\\\-" } },
+          ] },
+        ] },
       ],
     },
     select: { slug: true, title: true, content: true, space: { select: { key: true, id: true } } },
@@ -79,9 +96,15 @@ export async function getBacklinks(space: LinkSpace, slug: string, readable: Lin
   await Promise.all([...sources.values()].filter(s => s.id !== space.id).map(async s => {
     localNames.set(s.id, await getWikiDestinations(s.id));
   }));
-  return candidates.filter(page => extractWikiLinks(page.content).some(link => {
-    const literal = link.slug && (link.space || link.section !== undefined) && localNames.get(page.space.id)?.get(slugify(link.target));
-    if (literal) return page.space.id === space.id && literal === slug;
-    return (link.space ?? page.space.key) === space.key && destinations.get(link.slug) === slug;
-  })).map(({ title, slug, space: source }) => ({ title, slug, spaceKey: source.key }));
+  const otherSpaces = new Map([[space.key, destinations]]);
+  const matches = candidates.filter(page => {
+    const source = documentUrl(page.space.key, page.slug);
+    const options = { spaceKey: page.space.key, destinations: localNames.get(page.space.id)!, otherSpaces };
+    return linkedPageSlugs(page.content, source, space.key, options).has(slug);
+  });
+  return matches.map(page => ({ title: page.title, slug: page.slug, spaceKey: page.space.key }));
+}, ["document-backlinks-v1"], { tags: [backlinksTag], revalidate: 60 });
+
+export function getBacklinks(space: LinkSpace, slug: string, readable: LinkSpace[]) {
+  return findBacklinks({ id: space.id, key: space.key }, slug, readable.map(s => s.id).sort());
 }

@@ -1,11 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { prisma } from "./db";
-import { invalidateWikiNames } from "./wiki-link-destinations";
+import { invalidateBacklinks, invalidateWikiNames } from "./wiki-link-destinations";
 import { invalidatePageCache } from "./page-render-cache";
 import { slugify } from "./slug";
 
 function refreshVisibility(spaceId: string, id: string) {
+  invalidateBacklinks();
   invalidateWikiNames(spaceId);
   invalidatePageCache(id);
   revalidateTag("page-search");
