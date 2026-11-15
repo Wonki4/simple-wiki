@@ -26,21 +26,27 @@ export function searchSpaceIds(spaces: { id: string; key: string }[], key?: stri
 }
 
 export function searchCacheKeyParts(query: string, spaceIds: string[], page = 1, pageSize = API_PAGE_SIZE): string[] {
-  return ["search-paged", JSON.stringify({ s: [...spaceIds].sort(), q: query, page, pageSize })];
+  return ["search-paged-v2", JSON.stringify({ s: [...spaceIds].sort(), q: query, page, pageSize })];
 }
 
 async function runSearch(query: string, spaceIds: string[], requestedPage: number, pageSize: number) {
+  const literalTitle = query.replace(/[\\%_]/g, "\\$&");
   // 전체 건수와 페이지를 한 스냅샷에서 읽고, 스니펫은 현재 페이지의 문서에 대해서만 만든다.
   const rows = await prisma.$queryRaw<(SearchResult & { total: bigint })[]>`
     WITH matches AS MATERIALIZED (
-      SELECT p.id, ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) AS rank
+      SELECT p.id,
+        CASE WHEN p.title = ${query} THEN 2
+             WHEN p.title ILIKE ${literalTitle} THEN 1 ELSE 0 END AS title_match,
+        ts_rank(p."searchVector", websearch_to_tsquery('simple', ${query})) AS rank
       FROM "Page" p
       WHERE p."deletedAt" IS NULL AND p."spaceId" = ANY(${spaceIds})
         AND (p."searchVector" @@ websearch_to_tsquery('simple', ${query})
+          -- 역슬래시 등으로 기존 부분 검색 패턴에서 누락되는 제목도 포함한다.
+          OR p.title ILIKE ${literalTitle}
           OR p.title ILIKE '%' || ${query} || '%' OR p.content ILIKE '%' || ${query} || '%')
     ), totals AS (SELECT count(*) AS total FROM matches),
     hits AS (
-      SELECT id, rank FROM matches ORDER BY rank DESC, id
+      SELECT id, title_match, rank FROM matches ORDER BY title_match DESC, rank DESC, id
       LIMIT ${pageSize} OFFSET (
         SELECT LEAST(${requestedPage}::bigint - 1, GREATEST(total - 1, 0) / ${pageSize}::bigint) * ${pageSize} FROM totals
       )
@@ -49,7 +55,7 @@ async function runSearch(query: string, spaceIds: string[], requestedPage: numbe
       ts_headline('simple', p.content, websearch_to_tsquery('simple', ${query}),
         'StartSel=[[HL]],StopSel=[[/HL]],MaxWords=30,MinWords=10') AS snippet
     FROM hits JOIN "Page" p ON p.id = hits.id JOIN "Space" s ON s.id = p."spaceId" CROSS JOIN totals
-    ORDER BY hits.rank DESC, hits.id
+    ORDER BY hits.title_match DESC, hits.rank DESC, hits.id
   `;
   const total = Number(rows[0]?.total ?? 0);
   const totalPages = Math.ceil(total / pageSize);
