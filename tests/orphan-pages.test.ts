@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { linkedPageSlugs } from "@/lib/orphan-pages";
+import { linkedPageSlugs } from "@/lib/document-links";
 
 const source = new URL("https://wiki.example/s/eng/start");
 const options = {

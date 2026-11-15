@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { extractWikiLinks } from "@/lib/wiki-links";
-import { invalidateWikiNames } from "@/lib/wiki-link-destinations";
+import { invalidateBacklinks, invalidateWikiNames } from "@/lib/wiki-link-destinations";
 import { invalidatePageCache } from "@/lib/page-render-cache";
 import { selfAndDescendantIds } from "@/lib/page-tree";
 import {
@@ -97,6 +97,7 @@ async function commitRevision(input: {
     throw e;
   }
   invalidatePageCache(input.page.id);
+  invalidateBacklinks();
   if (input.title !== input.page.title) invalidateWikiNames(input.page.spaceId);
   return nextV;
 }
@@ -155,7 +156,10 @@ export async function createPageInSpace(
     return true;
   });
 
-  if (created) invalidateWikiNames(input.spaceId);
+  if (created) {
+    invalidateWikiNames(input.spaceId);
+    invalidateBacklinks();
+  }
   return { slug, created };
 }
 
