@@ -52,7 +52,7 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
 
     await page.goto(`/s/${key}/settings`);
     const groupForm = page.getByRole("form", { name: "그룹 권한 추가" });
-    await groupForm.getByLabel("그룹", { exact: true }).selectOption({ label: groupName });
+    await groupForm.getByRole("combobox", { name: "그룹", exact: true }).selectOption({ label: groupName });
     await groupForm.getByLabel("역할").selectOption("editor");
     await groupForm.getByRole("button", { name: "그룹 권한 추가" }).click();
     const row = page.getByRole("row").filter({ hasText: groupName });
@@ -61,7 +61,7 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
     await checkLayout(page);
 
     // 같은 그룹의 역할을 바꾸는 기존 동작과 즉시 권한 반영을 확인한다.
-    await groupForm.getByLabel("그룹", { exact: true }).selectOption({ label: groupName });
+    await groupForm.getByRole("combobox", { name: "그룹", exact: true }).selectOption({ label: groupName });
     await groupForm.getByLabel("역할").selectOption("viewer");
     await groupForm.getByRole("button", { name: "그룹 권한 추가" }).click();
     await expect(row.locator(".settings-role")).toHaveText("읽기");
@@ -71,6 +71,8 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
     await userForm.getByLabel("사용자 (이메일 또는 아이디)").fill("bob");
     await userForm.getByLabel("역할").selectOption("admin");
     await userForm.getByRole("button", { name: "사용자 권한 추가" }).click();
+    const userRow = page.getByRole("row").filter({ hasText: "bob@example.com" });
+    await expect(userRow.locator(".settings-role")).toHaveText("관리");
     await bob.goto(`/s/${key}/settings`);
     await expect(bob.getByRole("heading", { name: name + " 설정", exact: true })).toBeVisible();
     await expect(bob.getByRole("navigation", { name: "설정 메뉴" }).getByRole("link", { name: "그룹 관리" })).toHaveCount(0);
@@ -80,10 +82,12 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
 
     const visibility = page.getByRole("combobox", { name: "공개 범위" });
     await visibility.selectOption("organization");
+    const saved = page.waitForResponse(response => response.request().method() === "POST"
+      && new URL(response.url()).pathname === `/s/${key}/settings`);
     await page.getByRole("button", { name: "저장", exact: true }).click();
+    expect((await saved).ok()).toBe(true);
     await page.reload();
     await expect(visibility).toHaveValue("organization");
-    const userRow = page.getByRole("row").filter({ hasText: "bob@example.com" });
     page.once("dialog", dialog => dialog.accept());
     await userRow.getByRole("button", { name: "삭제", exact: true }).click();
     await expect(userRow).toHaveCount(0);
