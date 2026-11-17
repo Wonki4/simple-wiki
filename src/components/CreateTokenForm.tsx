@@ -11,8 +11,8 @@ export function CreateTokenForm({ spaces }: { spaces: { id: string; key: string;
 
   return (
     <div>
-      <form action={formAction} className="flex flex-wrap items-end gap-3">
-        <label className="field min-w-[16rem] flex-1">
+      <form action={formAction} className="settings-token-form">
+        <label className="field settings-token-name">
           <span>토큰 이름 (예: MCP 서버)</span>
           <input name="name" required placeholder="어디에 쓰는 토큰인지" className="input" />
         </label>

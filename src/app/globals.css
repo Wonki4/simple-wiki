@@ -864,6 +864,57 @@ mark {
   color: var(--ink-2);
 }
 
+/* 관리·설정 화면은 위키 탐색과 같은 본문 폭을 사용한다. */
+.settings-page { min-width: 0; padding: clamp(1.5rem, 3.4vw, 3.5rem) 0 5rem; }
+.settings-page .crumb { overflow-wrap: anywhere; }
+.settings-nav { display: flex; flex-wrap: wrap; gap: .25rem 1.1rem; margin: 1.15rem 0 2rem; border-bottom: 1px solid var(--border); }
+.settings-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; border-bottom: 2px solid transparent; font-size: .88rem; color: var(--muted); }
+.settings-nav a:hover { color: var(--ink); }
+.settings-nav a[aria-current="page"] { border-color: var(--accent); color: var(--ink); font-weight: 650; }
+.settings-heading { margin-bottom: 2rem; }
+.settings-heading .document-title { font-size: clamp(1.75rem, 3vw, 2.2rem); overflow-wrap: anywhere; }
+.settings-heading > p { margin-top: .8rem; color: var(--muted); line-height: 1.7; font-size: .9rem; }
+.settings-section { margin-block: 2rem; }
+.settings-section + .settings-section { padding-top: 1.75rem; border-top: 1px solid var(--border); }
+.settings-help { margin-top: .5rem; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
+.settings-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .85rem; align-items: end; }
+.settings-page :is(.field, .input, .select) { min-width: 0; max-width: 100%; }
+.settings-page :is(.input, .select, .btn) { min-height: 2.75rem; }
+.settings-page .field > span { line-height: 1.6; }
+.settings-group-create { margin-bottom: 2rem; }
+.settings-group { padding: 1.25rem; margin-top: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.settings-section-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.settings-section-heading > div { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+.settings-section-heading form { flex: none; }
+.settings-member-form, .settings-visibility-form { margin-top: 1rem; }
+.settings-permission-form { grid-template-columns: minmax(0, 1fr) 6.5rem auto; margin-top: 1.5rem; }
+.settings-table-wrap { margin-top: 1rem; }
+.settings-table { table-layout: fixed; }
+.settings-table :is(th, td) { overflow-wrap: anywhere; vertical-align: middle; }
+.settings-table th { font-family: var(--font-sans); letter-spacing: 0; }
+.settings-table .key { font-size: inherit; border: 0; background: none; padding: 0; }
+.settings-row-actions { text-align: right; }
+.settings-role { white-space: nowrap; font-weight: 600; }
+.settings-danger { border: 1px solid var(--danger-border); border-radius: var(--radius); padding: 1.25rem; margin-top: 2.5rem; }
+.settings-danger h2 { color: var(--danger); }
+.settings-space-form { display: grid; gap: 1.25rem; max-width: 32rem; }
+.settings-token-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.settings-token-name { grid-column: 1 / -1; }
+.settings-token-form > button { grid-column: 1 / -1; justify-self: start; }
+
+@media (max-width: 600px) {
+  .settings-nav { gap: 0 1rem; margin-bottom: 1.5rem; }
+  .settings-form, .settings-token-form { grid-template-columns: minmax(0, 1fr); }
+  .settings-form > .btn, .settings-token-form > .btn, .settings-space-form .btn { width: 100%; }
+  .settings-group { padding: 1rem; }
+  .settings-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .settings-table, .settings-table tbody { display: block; width: 100%; }
+  .settings-table tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+  .settings-table td { display: block; padding: 0; border: 0; }
+  .settings-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: .15rem; color: var(--muted); font-size: .75rem; }
+  .settings-table .settings-row-actions { text-align: left; margin-top: .25rem; }
+}
+
 /* ── Editor (Milkdown Crepe, 블록형 WYSIWYG) ───────────────────── */
 /* Crepe 색상 변수를 우리 디자인 토큰에 매핑한다.
    토큰이 다크모드에서 자동으로 뒤집히므로 에디터도 함께 따라온다. */
