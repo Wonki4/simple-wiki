@@ -1095,6 +1095,25 @@ mark {
   font-variant-numeric: tabular-nums;
 }
 .document-reactions { margin-top: 2.5rem; }
+.document-backlinks { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.backlinks__count { margin-left: .4rem; font-variant-numeric: tabular-nums; }
+.backlinks__list { display: grid; gap: .25rem 1.25rem; margin-top: .75rem; padding: .2rem; }
+.backlinks__list li { min-width: 0; }
+.backlinks__list a { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  padding-block: .3rem; color: var(--ink-2); font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.backlinks__list a:hover { color: var(--link); text-decoration: underline; }
+.backlinks__list.is-expanded { max-height: min(18rem, 50dvh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.backlinks__toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2rem; margin-top: .55rem;
+  color: var(--muted); font-size: .875rem; cursor: pointer; }
+.backlinks__toggle:hover { color: var(--ink); }
+.backlinks__toggle svg { width: .875rem; height: .875rem; }
+.backlinks__toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (min-width: 640px) {
+  .backlinks__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (pointer: coarse) {
+  .backlinks__list a, .backlinks__toggle { min-height: 2.75rem; }
+}
 .editor-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
