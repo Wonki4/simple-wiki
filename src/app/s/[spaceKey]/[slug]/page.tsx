@@ -10,6 +10,7 @@ import { WikiArticle } from "@/components/WikiArticle";
 import { ArticleToc } from "@/components/ArticleToc";
 import { DocumentLayout } from "@/components/DocumentLayout";
 import { DocumentSource } from "@/components/DocumentSource";
+import { DocumentBacklinks } from "@/components/DocumentBacklinks";
 import { getRenderedPage } from "@/lib/page-render-cache";
 import { deletePage, movePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
@@ -143,20 +144,7 @@ export default async function PageView({
         <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>
 
-      {backlinks.length > 0 && (
-        <aside className="mt-12 border-t pt-5">
-          <h2 className="eyebrow">이 페이지를 링크한 문서</h2>
-          <ul className="mt-3 grid gap-1.5 text-sm">
-            {backlinks.map((b) => (
-              <li key={`${b.spaceKey}/${b.slug}`}>
-                <Link href={`/s/${b.spaceKey}/${encodeURIComponent(b.slug)}`} className="title-link">
-                  {b.spaceKey === spaceKey ? b.title : `${b.spaceKey} · ${b.title}`}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      )}
+      <DocumentBacklinks backlinks={backlinks} spaceKey={spaceKey} />
 
       <section className="mt-6 border-t pt-6">
         <h2 className="section-title">
