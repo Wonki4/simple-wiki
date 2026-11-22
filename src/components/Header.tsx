@@ -26,11 +26,11 @@ export async function Header() {
             </Link>
             {session.isWikiAdmin && (
               <Link href="/groups" className="userbar__link">
-                그룹
+                그룹 관리
               </Link>
             )}
             <Link href="/settings/tokens" className="userbar__link">
-              토큰
+              개인 액세스 토큰
             </Link>
             <form
               action={async () => {

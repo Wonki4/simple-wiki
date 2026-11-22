@@ -881,6 +881,7 @@ mark {
 .settings-nav a:hover { color: var(--ink); }
 .settings-nav a[aria-current="page"] { border-color: var(--accent); color: var(--ink); font-weight: 650; }
 .settings-heading { margin-bottom: 2rem; }
+.settings-page > .crumb + .settings-heading { margin-top: 1.5rem; }
 .settings-heading .document-title { font-size: clamp(1.75rem, 3vw, 2.2rem); overflow-wrap: anywhere; }
 .settings-heading > p { margin-top: .8rem; color: var(--muted); line-height: 1.7; font-size: .9rem; }
 .settings-section { margin-block: 2rem; }
@@ -897,6 +898,24 @@ mark {
 .settings-section-heading form { flex: none; }
 .settings-member-form, .settings-visibility-form { margin-top: 1rem; }
 .settings-permission-form { grid-template-columns: minmax(0, 1fr) 6.5rem auto; margin-top: 1.5rem; }
+.permission-picker { position: relative; min-width: 0; }
+.permission-picker > .field { margin-bottom: .4rem; }
+.permission-picker__input { position: relative; }
+.permission-picker__input > .input { width: 100%; padding-right: 2.75rem; }
+.permission-picker__clear { position: absolute; top: 50%; right: .2rem; transform: translateY(-50%); }
+.permission-picker__panel { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 8px 24px #00000012; }
+.permission-picker__list { max-height: min(19rem, 45dvh); overflow-y: auto; overscroll-behavior: contain; padding: .25rem; }
+.permission-picker__option { display: flex; align-items: center; gap: .65rem; width: 100%; padding: .65rem .5rem;
+  border-radius: var(--radius); text-align: left; cursor: pointer; }
+.permission-picker__option:hover, .permission-picker__option[aria-selected="true"] { background: var(--surface-2); }
+.permission-picker__type { flex: none; font-size: .7rem; color: var(--muted); border: 1px solid var(--border); border-radius: .25rem; padding: .1rem .3rem; }
+.permission-picker__identity { display: grid; gap: .15rem; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.permission-picker__identity strong { font-size: .85rem; font-weight: 600; }
+.permission-picker__identity > span, .permission-picker__role { font-size: .75rem; color: var(--muted); }
+.permission-picker__role { flex: none; }
+.permission-picker__status { padding: .6rem .75rem; font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.permission-add__selected { color: var(--ink-2); }
 .settings-table-wrap { margin-top: 1rem; }
 .settings-table { table-layout: fixed; }
 .settings-table :is(th, td) { overflow-wrap: anywhere; vertical-align: middle; }

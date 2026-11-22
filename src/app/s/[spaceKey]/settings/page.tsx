@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { SettingsPage } from "@/components/SettingsPage";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
-import { addGroupPermission, addUserPermission, deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
+import { deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
+import { SpacePermissionForm } from "@/components/SpacePermissionForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 const roleLabels = { viewer: "읽기", editor: "편집", admin: "관리" };
@@ -21,8 +21,9 @@ export default async function SpaceSettingsPage({
   const userIds = space.permissions.filter((p) => p.subjectType === "user").map((p) => p.subjectRef);
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } });
   const userLabel = new Map(users.map((u) => [u.id, [u.name, u.email].filter(Boolean).join(" · ")]));
-  const allGroups = await prisma.wikiGroup.findMany({ orderBy: { name: "asc" } });
-  const groupLabel = new Map(allGroups.map((g) => [g.id, g.name]));
+  const groupIds = space.permissions.filter(p => p.subjectType === "group").map(p => p.subjectRef);
+  const groups = await prisma.wikiGroup.findMany({ where: { id: { in: groupIds } }, select: { id: true, name: true } });
+  const groupLabel = new Map(groups.map(g => [g.id, g.name]));
 
   const subjectLabel = (p: { subjectType: string; subjectRef: string }) =>
     p.subjectType === "user"
@@ -41,11 +42,11 @@ export default async function SpaceSettingsPage({
       <section className="settings-section" aria-labelledby="visibility-heading">
         <h2 id="visibility-heading" className="section-title">공개 범위</h2>
         <p id="visibility-help" className="settings-help">
-          전사 공개는 로그인한 모든 사용자가 읽을 수 있습니다. 제한된 스페이스는 권한을 부여한 사용자·그룹과 전역 관리자가 접근할 수 있습니다.
+          전체 공개는 로그인한 모든 사용자가 읽을 수 있습니다. 제한된 스페이스는 권한을 부여한 사용자·그룹과 전역 관리자가 접근할 수 있습니다.
         </p>
         <form action={updateSpaceVisibility.bind(null, spaceKey)} className="settings-form settings-visibility-form">
           <select name="visibility" aria-label="공개 범위" aria-describedby="visibility-help" defaultValue={space.visibility} className="select">
-            <option value="organization">전사 공개</option>
+            <option value="organization">전체 공개</option>
             <option value="restricted">제한</option>
           </select>
           <button className="btn btn-primary">저장</button>
@@ -92,45 +93,7 @@ export default async function SpaceSettingsPage({
           </table>
         </div>
 
-        <form action={addGroupPermission.bind(null, spaceKey)} aria-label="그룹 권한 추가" className="settings-form settings-permission-form">
-          <label className="field">
-            <span>그룹</span>
-            <select name="groupId" required defaultValue="" className="select" disabled={allGroups.length === 0}>
-              <option value="" disabled>{allGroups.length ? "그룹 선택" : "등록된 그룹 없음"}</option>
-              {allGroups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>역할</span>
-            <select name="role" className="select" aria-describedby="role-help">
-              {Object.entries(roleLabels).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
-            </select>
-          </label>
-          <button className="btn btn-primary" disabled={allGroups.length === 0}>그룹 권한 추가</button>
-        </form>
-        {allGroups.length === 0 && (
-          <p className="settings-help">
-            {session.isWikiAdmin
-              ? <>그룹을 먼저 만들어 주세요. <Link className="linklike" href="/groups">그룹 관리로 이동</Link></>
-              : "전역 관리자에게 그룹 생성을 요청하세요."}
-          </p>
-        )}
-
-        <form action={addUserPermission.bind(null, spaceKey)} aria-label="사용자 권한 추가" className="settings-form settings-permission-form">
-          <label className="field">
-            <span>사용자 (이메일 또는 아이디)</span>
-            <input name="email" type="text" required placeholder="alice@example.com 또는 alice" className="input" />
-          </label>
-          <label className="field">
-            <span>역할</span>
-            <select name="role" className="select" aria-describedby="role-help">
-              {Object.entries(roleLabels).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
-            </select>
-          </label>
-          <button className="btn btn-primary">사용자 권한 추가</button>
-        </form>
+        <SpacePermissionForm spaceKey={spaceKey} />
       </section>
 
       {session.isWikiAdmin && (
