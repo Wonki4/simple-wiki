@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { login } from "./helpers";
+import { fillMarkdown, login, readMarkdown } from "./helpers";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=";
 const endpoint = "**/api/spaces/notice/attachments";
@@ -22,10 +22,10 @@ for (const kind of ["paste", "drop"] as const) {
   test(`${kind}로 올린 이미지 중 실패한 한 장만 다시 올린다`, async ({ page }) => {
     await login(page, "wiki-admin", "admin1234");
     await page.goto("/s/notice/new");
-    const editor = page.locator(".milkdown .ProseMirror").first();
+    const editor = page.locator(".live-editor .cm-content").first();
     await editor.click();
-    const hintContent = () => editor.locator(".crepe-placeholder").first().evaluate(el => getComputedStyle(el, "::before").content);
-    await expect.poll(hintContent).toContain("본문을 입력하세요");
+    const hint = editor.locator(".cm-placeholder");
+    await expect(hint).toContainText("본문을 입력하세요");
 
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
@@ -42,10 +42,10 @@ for (const kind of ["paste", "drop"] as const) {
     });
     try {
       await sendImages(editor, kind, ["ok.png", "retry.png"]);
-      await expect(editor.getByRole("status")).toHaveText("이미지 올리는 중…");
-      await expect.poll(hintContent).toBe("none");
+      await expect(page.getByRole("status").filter({ hasText: "파일 올리는 중" })).toBeVisible();
+      await expect(hint).toBeHidden();
       await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
-      await expect(page.getByRole("button", { name: "원문", exact: true })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "올리는 중…", exact: true })).toBeDisabled();
     } finally {
       release();
     }
@@ -67,9 +67,8 @@ test("여러 첨부 중 실패한 파일만 재시도하고 원문과 성공한 
   await page.goto("/s/notice/new");
   const title = `upload-retry-${Date.now()}`;
   await page.getByRole("textbox", { name: "제목" }).fill(title);
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  const source = page.getByRole("textbox", { name: "마크다운 원문" });
-  await source.fill("남겨야 할 본문\n");
+  const source = page.getByRole("textbox", { name: "본문", exact: true });
+  await fillMarkdown(page, "남겨야 할 본문\n", false);
   const requests: string[] = [];
   await page.route(endpoint, async route => {
     const name = /filename="([^"]+)"/.exec(route.request().postDataBuffer()!.toString())![1];
@@ -89,15 +88,15 @@ test("여러 첨부 중 실패한 파일만 재시도하고 원문과 성공한 
   const blocked = list.getByRole("listitem").filter({ hasText: "blocked.txt" });
   await expect(retry).toContainText("네트워크");
   await expect(blocked).toContainText("권한");
-  await expect(source).toHaveValue(/last\.txt/);
-  const previous = await source.inputValue();
+  await expect(source).toContainText("last.txt");
+  const previous = await readMarkdown(page);
   await retry.getByRole("button", { name: "다시 시도" }).click();
   await expect(retry).toContainText("503");
-  await expect(source).toHaveValue(previous);
+  expect(await readMarkdown(page)).toBe(previous);
   await retry.getByRole("button", { name: "다시 시도" }).click();
   await expect(retry).toHaveCount(0);
-  await expect(source).toHaveValue(/retry\.txt/);
-  expect(await source.inputValue()).toContain(previous);
+  await expect(source).toContainText("retry.txt");
+  expect(await readMarkdown(page)).toContain(previous);
   await blocked.getByRole("button", { name: "목록에서 제거" }).click();
   await expect(list).toHaveCount(0);
   expect(requests).toEqual([...files, "retry.txt", "retry.txt"]);
@@ -111,22 +110,21 @@ test("여러 첨부 중 실패한 파일만 재시도하고 원문과 성공한 
   await expect(article).not.toContainText("blocked.txt");
 });
 
-test("이미지 블록에서 고른 파일은 다시 선택하지 않아도 원래 블록을 채운다", async ({ page }) => {
+test("실패한 이미지의 삽입 위치는 후속 편집 뒤에도 유지한다", async ({ page }) => {
   await login(page, "wiki-admin", "admin1234");
   await page.goto("/s/notice/new");
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  await page.getByRole("textbox", { name: "마크다운 원문" }).fill("앞 문단\n\n![]()\n\n뒤 문단");
-  await page.getByRole("button", { name: "블록", exact: true }).click();
-  const editor = page.locator(".milkdown .ProseMirror").first();
-  const picker = editor.locator('input[type="file"][accept="image/*"]');
+  const editor = page.locator(".live-editor .cm-content");
+  await editor.fill("앞 문단\n\n뒤 문단");
+  await editor.getByText("뒤 문단", { exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+End");
   await page.route(endpoint, route => route.fulfill({ status: 401 }), { times: 1 });
-  await picker.setInputFiles({ name: "picker.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
-  const failed = page.getByRole("listitem").filter({ hasText: "picker.png" });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "retry-position.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  const failed = page.getByRole("listitem").filter({ hasText: "retry-position.png" });
   await expect(failed).toContainText("로그인");
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+Home");
+  await page.keyboard.insertText("새 첫줄\n\n");
   await failed.getByRole("button", { name: "다시 시도" }).click();
-  const image = editor.locator('img[src^="/api/attachments/"]');
-  await expect(image).toHaveCount(1);
-  await expect(picker).toHaveCount(0);
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "마크다운 원문" })).toHaveValue(/앞 문단[\s\S]*!\[[^\]]*\]\(\/api\/attachments\/[^)]+\)[\s\S]*뒤 문단/);
+  await expect(editor.locator('img[src^="/api/attachments/"]')).toHaveCount(1);
+  expect(await readMarkdown(page)).toMatch(/^새 첫줄\n\n앞 문단\n\n뒤 문단!\[retry-position\.png\]\(\/api\/attachments\/[^)]+\)\n\n$/);
 });

@@ -32,7 +32,7 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
   await page.getByRole("link", { name: "엔지니어링" }).first().click();
   await page.getByRole("link", { name: "새 문서" }).click();
   await page.getByPlaceholder("제목").fill("E2E 온보딩");
-  await page.locator(".milkdown .ProseMirror").click();
+  await page.locator(".live-editor .cm-content").click();
   await page.keyboard.type("# 환영\n\n[[없는 문서]] 참고");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "E2E 온보딩" })).toBeVisible();
@@ -40,7 +40,7 @@ test("alice: 페이지 생성 → 위키링크 → 편집 → 이력 → 검색"
 
   // 편집 → 이력 2개
   await page.getByRole("link", { name: "편집" }).click();
-  await page.locator(".milkdown .ProseMirror").click();
+  await page.locator(".live-editor .cm-content").click();
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type("\n\n두 번째 버전");
   await page.getByRole("button", { name: "저장" }).click();
@@ -165,7 +165,7 @@ test("검색 권한 격리: 비권한자에겐 제한 스페이스 문서가 검
   await page.getByRole("link", { name: "엔지니어링" }).first().click();
   await page.getByRole("link", { name: "새 문서" }).click();
   await page.getByPlaceholder("제목").fill("검색격리 테스트");
-  await page.locator(".milkdown .ProseMirror").click();
+  await page.locator(".live-editor .cm-content").click();
   await page.keyboard.type(`# 검색격리\n\n${marker} 는 eng 전용 고유어`);
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "검색격리 테스트" })).toBeVisible();
@@ -384,7 +384,7 @@ test("웹 충돌 UX: 외부 수정 후 저장하면 충돌 배너, 재저장은 
 
   // 편집 화면 진입(에디터 expectedVersion=1)
   await page.goto(`/s/eng/${slug}/edit`);
-  await page.locator(".milkdown .ProseMirror").click();
+  await page.locator(".live-editor .cm-content").click();
   await page.keyboard.type(" 내 수정");
 
   // 외부에서 먼저 저장 → v2
@@ -417,18 +417,18 @@ test("파일 첨부: 버튼으로 올리고 본문 다운로드 링크로 확인
   await page.goto("/s/eng/new");
   await page.getByRole("textbox", { name: "제목" }).fill("파일 첨부 테스트");
 
-  // 에디터(Crepe) 비동기 초기화가 끝나기 전의 change 이벤트는 무시된다(crepeRef 가드).
+  // 편집기가 준비되면 본문에 커서를 둔다.
   // 다른 에디터 테스트처럼 본문 클릭으로 초기화 완료를 기다리고 커서도 본문에 둔다.
-  await page.locator(".milkdown .ProseMirror").click();
+  await page.locator(".live-editor .cm-content").click();
 
-  // 숨긴 파일 input은 form 직계 자식 — Crepe 내부의 이미지 input과 구분된다.
+  // 파일 첨부 버튼과 연결된 입력을 사용한다.
   await page.locator('form > input[type="file"]').setInputFiles({
     name: "spec.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("hello attachment"),
   });
   // 업로드 완료 → 에디터 본문에 링크 텍스트 삽입 확인
-  await expect(page.locator(".wysiwyg").getByText("spec.txt")).toBeVisible();
+  await expect(page.locator(".live-editor").getByText("spec.txt")).toBeVisible();
 
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "파일 첨부 테스트" })).toBeVisible();

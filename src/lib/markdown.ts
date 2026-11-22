@@ -2,27 +2,15 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import rehypeSanitize from "rehype-sanitize";
+import { markdownSchema } from "./markdown-schema";
+import { footnoteLinks } from "./footnote-links";
 import rehypeShiki from "@shikijs/rehype";
 import rehypeStringify from "rehype-stringify";
 import { readingMarkup, type Section } from "./reading-markup";
 import { type WikiLinkOptions, remarkWikiLinks } from "./wiki-links";
 
 // sanitize는 shiki보다 먼저 실행한다. shiki가 넣는 style 속성이 살아남도록.
-const schema = {
-  ...defaultSchema,
-  attributes: {
-    ...defaultSchema.attributes,
-    a: (Array.isArray(defaultSchema.attributes?.a)
-      ? defaultSchema.attributes.a.filter((item: any) => !Array.isArray(item) || item[0] !== "className")
-      : []
-    ).concat([["className", "wiki-link", "wiki-link-missing"]] as any) as any,
-    code: (Array.isArray(defaultSchema.attributes?.code)
-      ? defaultSchema.attributes.code.filter((item: any) => !Array.isArray(item) || item[0] !== "className")
-      : []
-    ).concat([["className", /^language-./]] as any) as any,
-  },
-} as any;
 
 export async function renderMarkdown(markdown: string, opts: WikiLinkOptions) {
   const sections: Section[] = [];
@@ -31,7 +19,8 @@ export async function renderMarkdown(markdown: string, opts: WikiLinkOptions) {
     .use(remarkGfm)
     .use(remarkWikiLinks, opts)
     .use(remarkRehype)
-    .use(rehypeSanitize, schema)
+    .use(rehypeSanitize, markdownSchema)
+    .use(footnoteLinks)
     .use(readingMarkup, sections)
     .use(rehypeShiki, {
       // 라이트 색을 인라인 color로, 다크 색을 --shiki-dark CSS 변수로 내보낸다.

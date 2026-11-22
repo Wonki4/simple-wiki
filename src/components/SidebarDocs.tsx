@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { NavigationLink as Link } from "./NavigationLink";
 import { NavLink } from "@/components/NavLink";
 import { buildTree, type TreeNode, type TreePageInput } from "@/lib/page-tree";
 

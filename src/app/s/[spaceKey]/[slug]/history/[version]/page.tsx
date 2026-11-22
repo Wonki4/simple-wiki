@@ -5,6 +5,11 @@ import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { getRenderedPage } from "@/lib/page-render-cache";
 import { WikiArticle } from "@/components/WikiArticle";
+import { ArticleToc } from "@/components/ArticleToc";
+import { DocumentLayout } from "@/components/DocumentLayout";
+import { DocumentSource } from "@/components/DocumentSource";
+import { Disclosure } from "@/components/Disclosure";
+import { WikiIcon } from "@/components/WikiIcon";
 import { restoreRevision } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
@@ -33,15 +38,10 @@ export default async function RevisionPage({
   const article = await getRenderedPage({ pageId: page.id, version, spaceId: space.id, spaceKey, content: rev.content, readable: await listReadableSpaces(session) });
 
   return (
-    <main className="py-10">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="eyebrow">
-            revision v{version}{isLatest && " · 최신"}
-          </p>
-          <h1 className="page-title mt-1">{rev.title}</h1>
-        </div>
-        <div className="flex shrink-0 gap-2">
+    <DocumentLayout sections={article.sections}>
+      <div className="document-toolbar document-toolbar--revision">
+        <p className="document-path">revision v{version}{isLatest && " · 최신"}</p>
+        <div className="document-actions">
           <Link href={`/s/${spaceKey}/${encodeURIComponent(slug)}/history`} className="btn btn-ghost btn-sm">
             이력으로
           </Link>
@@ -52,9 +52,18 @@ export default async function RevisionPage({
               </ConfirmSubmitButton>
             </form>
           )}
+          <Disclosure label="문서 더보기" trigger={<WikiIcon name="more" />}>
+            <DocumentSource source={rev.content} title={`${rev.title} · v${version}`} />
+          </Disclosure>
         </div>
       </div>
-      <div className="mt-7"><WikiArticle {...article} source={rev.content} /></div>
-    </main>
+      <header className="document-heading">
+        <h1 className="document-title">{rev.title}</h1>
+        {article.sections.length > 1 && <div className="document-meta-row document-meta-row--toc">
+          <ArticleToc sections={article.sections} compact />
+        </div>}
+      </header>
+      <WikiArticle html={article.html} />
+    </DocumentLayout>
   );
 }

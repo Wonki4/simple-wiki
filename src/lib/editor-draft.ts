@@ -4,24 +4,22 @@ export interface PageDraft {
   expectedVersion?: number;
 }
 
-export interface LocalDraft extends PageDraft {
-  mode?: "block" | "source";
-}
-
-export function readDraft(key: string): LocalDraft | null {
+export function readDraft(key: string): PageDraft | null {
   try {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
     const draft = JSON.parse(raw);
     if (typeof draft?.title !== "string" || typeof draft.content !== "string") return null;
     if (draft.expectedVersion !== undefined && !Number.isInteger(draft.expectedVersion)) return null;
-    return draft;
+    // Older drafts can contain an editor mode. Their content/version still
+    // restore normally into the single live editor.
+    return { title: draft.title, content: draft.content, expectedVersion: draft.expectedVersion };
   } catch {
     return null;
   }
 }
 
-export function storeDraft(key: string, draft: LocalDraft | null): boolean {
+export function storeDraft(key: string, draft: PageDraft | null): boolean {
   try {
     if (draft) sessionStorage.setItem(key, JSON.stringify(draft));
     else sessionStorage.removeItem(key);

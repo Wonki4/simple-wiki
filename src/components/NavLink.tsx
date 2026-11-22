@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { NavigationLink as Link } from "./NavigationLink";
 import { usePathname } from "next/navigation";
 
 interface Props {

@@ -64,3 +64,9 @@ it("소제목·중복 제목 앵커와 공간별 링크를 렌더링하고 접�
   expect(html).toContain("참고");
   expect(html).not.toMatch(/restricted|unknown|\/new\?/);
 });
+
+it("각주와 본문으로 돌아가는 링크는 sanitize 후에도 실제 ID와 일치한다", async () => {
+  const { html } = await renderMarkdown("각주[^a] 다시[^a]\n\n[^a]: 설명", opts);
+  const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
+  for (const match of html.matchAll(/href="#([^"]+)"/g)) expect(ids.has(match[1]), match[1]).toBe(true);
+});

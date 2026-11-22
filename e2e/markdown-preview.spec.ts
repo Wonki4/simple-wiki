@@ -1,96 +1,93 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { fillMarkdown, login, readMarkdown } from "./helpers";
 
-const api = "/api/spaces/notice";
-const previewUrl = `${api}/preview`;
+const previewUrl = "/api/spaces/notice/preview";
+const sample = "## 제목\n\n**강조**와 *기울임* 그리고 [링크](https://example.com)\n\n| 항목 | 상태 |\n| --- | --- |\n| 테스트 | 완료 |\n\n~~~js\nconst text = '[[코드]]';\n~~~\n\n마지막 줄";
 
-test("저장 전 미리보기와 읽기 화면이 같고, 미리보기만으로는 문서 버전이 생기지 않는다", async ({ page }) => {
-  await login(page, "wiki-admin", "admin1234");
-  const slug = `preview-${Date.now()}`;
-  const original = "저장된 첫 문장";
-  expect((await page.request.post(`${api}/pages`, { data: { title: slug, content: original } })).status()).toBe(201);
-  const uploaded = await page.request.post(`${api}/attachments`, { multipart: { file: {
-    name: "preview.png", mimeType: "image/png",
-    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=", "base64"),
-  } } });
-  expect(uploaded.ok()).toBe(true);
-  const { url } = await uploaded.json();
-  const markdown = [
-    "## 다음 버전", "", "| 항목 | 상태 |", "| --- | --- |", "| 테스트 | 완료 |", "",
-    "~~~js", "const ok = true;", "~~~", "", `[[${slug}|원래 문서]]와 [[없는-${slug}]]`, "",
-    `![첨부 미리보기](${url})`, "", "<script>alert(1)</script>",
-  ].join("\n");
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`/s/notice/${slug}/edit`);
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  const source = page.getByRole("textbox", { name: "마크다운 원문" });
-  const preview = page.getByRole("region", { name: "본문 미리보기" });
-  await source.fill(markdown);
-  await page.getByRole("button", { name: "미리보기 열기" }).click();
-  await expect(preview.getByRole("cell", { name: "완료" })).toBeVisible();
-  await expect(preview.locator("pre.shiki")).toContainText("const ok");
-  await expect(preview.getByRole("link", { name: "원래 문서" })).toHaveAttribute("href", `/s/notice/${slug}`);
-  await expect(preview.locator("a.wiki-link-missing")).toHaveCount(1);
-  await expect.poll(() => preview.getByRole("img").evaluate(img => (img as HTMLImageElement).naturalWidth)).toBe(1);
-  await expect(preview.locator("script")).toHaveCount(0);
-  expect((await preview.boundingBox())!.x).toBeGreaterThan((await source.boundingBox())!.x);
-  const stored = await (await page.request.get(`${api}/pages/${slug}`)).json();
-  expect(stored).toMatchObject({ version: 1, content: original });
-
-  const newer = markdown.replace("다음 버전", "최종 제목");
-  await source.fill(newer);
-  await expect(preview.getByRole("heading", { name: /최종 제목/ })).toBeVisible();
-  const html = await preview.locator("article").innerHTML();
-  await page.setViewportSize({ width: 320, height: 800 });
-  const field = (await source.boundingBox())!;
-  expect((await preview.boundingBox())!.y).toBeGreaterThanOrEqual(field.y + field.height);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
-  await page.getByRole("button", { name: "저장", exact: true }).click();
-  const published = page.locator("article.prose-wiki");
-  await expect(page).toHaveURL(`/s/notice/${slug}`);
-  expect(await published.innerHTML()).toBe(html);
-});
-
-test("미리보기 오류에서 재시도하고 비우기·모드 전환 후에도 초안을 계속 편집한다", async ({ page }) => {
+async function openEditor(page: import("@playwright/test").Page, content = sample) {
   await login(page, "wiki-admin", "admin1234");
   await page.goto("/s/notice/new");
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  const input = page.getByRole("textbox", { name: "마크다운 원문" });
-  const preview = page.getByRole("region", { name: "본문 미리보기" });
-  await page.getByRole("button", { name: "미리보기 열기" }).click();
-  await expect(preview).toContainText("미리 볼 본문이 없습니다.");
-  await page.route(`**${previewUrl}`, route => route.fulfill({ status: 503 }), { times: 1 });
-  await input.fill("**복구할 초안**");
-  await expect(preview.getByRole("alert")).toBeVisible();
-  await expect(input).toHaveValue("**복구할 초안**");
-  await preview.getByRole("button", { name: "다시 시도" }).click();
-  await expect(preview.locator("strong")).toHaveText("복구할 초안");
+  await fillMarkdown(page, content);
+  return page.locator(".live-editor .cm-content");
+}
 
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  await page.route(`**${previewUrl}`, async route => {
-    if (route.request().postDataJSON().content !== "느린 응답") return route.continue();
-    await held;
-    await route.fulfill({ json: { html: "<p>느린 응답</p>" } });
-  });
-  const requested = page.waitForRequest(req => req.url().endsWith(previewUrl) && req.postDataJSON().content === "느린 응답");
-  await input.fill("느린 응답");
-  await requested;
+test("클릭한 줄과 표만 원문으로 펼치고 다른 줄은 같은 자리에서 서식으로 표시한다", async ({ page }) => {
+  const editor = await openEditor(page);
+  await expect(page.getByRole("region", { name: "본문 미리보기" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "편집 방식" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(라이브|원문)$/ })).toHaveCount(0);
+  await expect(editor.locator(".live-heading")).toHaveText("제목");
+  await expect(editor.locator("strong")).toHaveText("강조");
+  await expect(editor.getByRole("cell", { name: "완료" })).toBeVisible();
+  await expect(editor.locator("pre code")).toContainText("[[코드]]");
+  await editor.locator(".live-heading").click();
+  await expect(editor.locator(".live-heading")).toHaveText("## 제목");
+  await expect(editor.locator("strong")).toHaveText("강조");
+  await editor.getByRole("cell", { name: "완료" }).click();
+  await expect(editor.locator("table")).toHaveCount(0);
+  await expect(editor).toContainText("| 테스트 | 완료 |");
+  await expect(editor.locator(".live-heading")).toHaveText("제목");
+  await editor.getByText("마지막 줄", { exact: true }).click();
+  await expect(editor.locator("table")).toBeVisible();
+  expect(await readMarkdown(page)).toBe(sample);
+});
+
+test("실제 입력과 실행 취소, 다시 실행, 새로고침이 원문과 초안을 보존한다", async ({ page }) => {
+  const editor = await openEditor(page);
+  await editor.getByText("마지막 줄", { exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.insertText(" 수정");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(editor).toContainText("마지막 줄");
+  await expect(editor).not.toContainText("마지막 줄 수정");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(editor).toContainText("마지막 줄 수정");
+  expect(await readMarkdown(page)).toBe(sample + " 수정");
+  await page.reload();
+  expect(await readMarkdown(page)).toBe(sample + " 수정");
+});
+
+test("라이브 편집에서도 한글 조합 중에는 문법이나 자동완성이 입력을 가로채지 않는다", async ({ page }) => {
+  const editor = await openEditor(page, "## ");
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  const ime = await page.context().newCDPSession(page);
+  await ime.send("Input.imeSetComposition", { text: "ㅎ", selectionStart: 1, selectionEnd: 1 });
+  await ime.send("Input.imeSetComposition", { text: "한글", selectionStart: 2, selectionEnd: 2 });
+  await editor.dispatchEvent("keydown", { key: "Enter", isComposing: true, keyCode: 229 });
+  await expect(editor).toContainText("한글");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await ime.send("Input.insertText", { text: "한글" });
+  expect(await readMarkdown(page)).toBe("## 한글");
+});
+
+test("좁은 화면에서도 표와 긴 링크가 편집 화면을 밀어내지 않는다", async ({ page }) => {
+  const editor = await openEditor(page, sample + "\n\n[긴 링크](https://example.com/" + "long-path".repeat(30) + ")");
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(editor.locator("table")).toBeVisible();
+    const header = (await editor.locator("th").first().boundingBox())!;
+    const cell = (await editor.locator("td").first().boundingBox())!;
+    expect(Math.abs(header.x - cell.x)).toBeLessThan(2);
+    expect(Math.abs(header.width - cell.width)).toBeLessThan(2);
+    expect(Math.abs(cell.y - header.y - header.height)).toBeLessThan(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeInViewport();
+  }
+});
+
+test("터치 화면에서도 표를 누르면 원문을 편집할 수 있다", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   try {
-    await input.fill("## 최신 입력");
-    await expect(preview.getByRole("heading", { name: /최신 입력/ })).toBeVisible();
-  } finally { release(); }
-  await page.unrouteAll({ behavior: "wait" });
-  await expect(preview.locator("article")).not.toContainText("느린 응답");
-  await page.getByRole("button", { name: "블록", exact: true }).click();
-  await expect(preview).toBeHidden();
-  await page.getByRole("button", { name: "원문", exact: true }).click();
-  await expect(input).toHaveValue("## 최신 입력");
-  await input.fill("");
-  await expect(preview).toContainText("미리 볼 본문이 없습니다.");
-  await expect(preview.locator("article")).toHaveCount(0);
-  await page.getByRole("button", { name: "미리보기 닫기" }).click();
-  await expect(preview).toBeHidden();
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const editor = await openEditor(page);
+    await editor.getByRole("cell", { name: "완료" }).tap();
+    await expect(editor.locator("table")).toHaveCount(0);
+    await expect(editor).toContainText("| 테스트 | 완료 |");
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
 });
 
 test("미리보기 API는 편집 권한을 확인한 후에만 본문을 렌더링한다", async ({ page, request }) => {

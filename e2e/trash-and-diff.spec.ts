@@ -23,6 +23,10 @@ test("삭제한 문서를 검색·API에서 숨기고 이력·댓글·좋아요�
   expect((await page.request.put(`${api}/pages/${slug}`, { data: { title: slug, content: "수정 원문" } })).ok()).toBe(true);
   await page.goto(path);
   await page.getByRole("button", { name: "좋아요", exact: true }).click();
+  // Wait for the server action and its page refresh before the next mutation.
+  const liked = page.getByRole("button", { name: "좋아요 취소", exact: true });
+  await expect(liked).toHaveAttribute("aria-pressed", "true");
+  await expect(liked).toBeEnabled();
   await page.getByPlaceholder("댓글을 남겨보세요").fill("복원할 댓글");
   await page.getByRole("button", { name: "댓글 작성" }).click();
   await expect(page.getByText("복원할 댓글", { exact: true })).toBeVisible();
