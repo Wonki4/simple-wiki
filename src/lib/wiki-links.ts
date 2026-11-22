@@ -4,6 +4,7 @@ import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import type { Root, PhrasingContent } from "mdast";
 import { sectionId, slugify } from "./slug";
+import { textSourceOffsets } from "./markdown-text";
 
 const parser = unified().use(remarkParse).use(remarkGfm);
 const wikiLinkPattern = /\[\[([^\[\]|\r\n]+)(?:\|([^\[\]\r\n]+))?\]\]/g;
@@ -25,13 +26,25 @@ export function splitWikiTarget(target: string) {
 }
 
 // 렌더링과 백링크 색인이 같은 텍스트 노드를 해석한다. 기존 링크 안에는 링크를 중첩하지 않는다.
-function walkWikiLinks(tree: Root, onLink: (link: WikiLink) => PhrasingContent | void) {
+function walkWikiLinks(tree: Root, onLink: (link: WikiLink) => PhrasingContent | void, source?: string) {
   visit(tree, (node, index, parent) => {
     if (node.type === "link" || node.type === "linkReference") return SKIP;
     if (node.type !== "text" || index === undefined || !parent) return;
+    if (!node.value.includes("[[")) return;
     const children: PhrasingContent[] = [];
+    const raw = source?.slice(node.position?.start.offset, node.position?.end.offset);
+    const offsets = raw === undefined ? null : textSourceOffsets(raw, node.value);
     let end = 0;
     for (const match of node.value.matchAll(wikiLinkPattern)) {
+      if (raw !== undefined) {
+        if (!offsets) continue;
+        const start = offsets[match.index];
+        const close = offsets[match.index + match[0].length - 2];
+        if (raw.slice(start, start + 2) !== "[[" || raw.slice(close, close + 2) !== "]]") continue;
+        let slashes = 0;
+        for (let i = start - 1; raw[i] === "\\"; i--) slashes++;
+        if (slashes % 2) continue;
+      }
       const target = match[1].trim();
       const { space, name, section } = splitWikiTarget(target);
       const slug = slugify(name);
@@ -55,7 +68,7 @@ export function extractWikiLinks(markdown: string): WikiLink[] {
   walkWikiLinks(parser.parse(markdown), (link) => {
     const key = JSON.stringify([link.space, link.slug, link.section === undefined ? null : link.target]);
     if (!links.has(key)) links.set(key, link);
-  });
+  }, markdown);
   return [...links.values()];
 }
 
@@ -87,7 +100,7 @@ export function resolveWikiLink(link: WikiLink, options: WikiLinkOptions): Resol
 }
 
 export function remarkWikiLinks(options: WikiLinkOptions) {
-  return (tree: Root) => walkWikiLinks(tree, link => {
+  return (tree: Root, file: { value?: unknown }) => walkWikiLinks(tree, link => {
     const target = resolveWikiLink(link, options);
     const text = { type: "text" as const, value: link.label };
     if (!target || (link.space && target.kind === "missing")) return text;
@@ -102,5 +115,5 @@ export function remarkWikiLinks(options: WikiLinkOptions) {
       type: "link", url: (target.slug ? `${home}/${encodeURIComponent(target.slug)}` : "") + fragment,
       data: { hProperties: { className: ["wiki-link"] } }, children: [text],
     };
-  });
+  }, typeof file.value === "string" ? file.value : undefined);
 }

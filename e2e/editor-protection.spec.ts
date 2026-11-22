@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { fillMarkdown, login, readMarkdown } from "./helpers";
 
 const pages = "/api/spaces/notice/pages";
 const newPage = "/s/notice/new";
@@ -19,7 +19,7 @@ test("제목만 바꾸면 원문을 그대로 저장하고 본문 편집 후에�
   expect(created.status()).toBe(201);
   const url = `/s/notice/${title}`;
   await page.goto(`${url}/edit`);
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   await expect(editor).toContainText("마지막 문단");
   await page.getByRole("textbox", { name: "제목" }).fill(`${title} 수정`);
   await page.getByRole("button", { name: "저장" }).click();
@@ -28,7 +28,8 @@ test("제목만 바꾸면 원문을 그대로 저장하고 본문 편집 후에�
 
   await page.goto(`${url}/edit`);
   await editor.getByText("마지막 문단").click();
-  await page.keyboard.press("End");
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("ArrowLeft");
   await page.keyboard.insertText(" 수정");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page).toHaveURL(url);
@@ -37,7 +38,7 @@ test("제목만 바꾸면 원문을 그대로 저장하고 본문 편집 후에�
   expect(saved).toContain(`\`${regex}\``);
   expect(saved).toContain("[[Guide|안내]]");
   expect(saved).toContain(String.raw`\[괄호`);
-  expect(saved).toContain("마지막 문단 수정");
+  expect(saved).toBe(source.replace("마지막 문단", "마지막 문단 수정"));
   await expect(page.getByRole("link", { name: "안내", exact: true })).toBeVisible();
 });
 
@@ -48,7 +49,7 @@ test("중복 주소에서도 제목과 본문을 유지하고 새로고침 후 �
   expect((await Promise.all([create(), create()])).map(r => r.status()).sort()).toEqual([201, 409]);
   await page.goto(newPage);
   const titleBox = page.getByRole("textbox", { name: "제목" });
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   await titleBox.fill(title.toUpperCase());
   await editor.fill("다른 문서로 저장할 초안");
   await page.getByRole("button", { name: "저장" }).click();
@@ -70,7 +71,7 @@ test("중복 주소에서도 제목과 본문을 유지하고 새로고침 후 �
 
 test("입력 직후 새로고침과 페이지 이동은 초안을 복원하고 취소는 폐기한다", async ({ page }) => {
   await page.goto(newPage);
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   const titleBox = page.getByRole("textbox", { name: "제목" });
   await titleBox.fill("작성 중");
   await editor.fill("아직 제출하지 않은 본문");
@@ -92,7 +93,7 @@ test("초안 복원 후에도 이전 버전 기준으로 충돌을 감지하고 
   const title = `editor-conflict-${Date.now()}`;
   expect((await page.request.post(pages, { data: { title, content: "첫 버전" } })).status()).toBe(201);
   await page.goto(`/s/notice/${title}/edit`);
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   await editor.fill("내 초안");
   expect((await page.request.put(`${pages}/${title}`, { data: { title, content: "상대의 수정" } })).ok()).toBe(true);
   await page.reload();
@@ -108,7 +109,7 @@ test("새 문서 초안은 대상별로 분리되고 저장 공간이 막혀도 
   const title = `editor-storage-${Date.now()}`;
   await page.goto(newPage);
   const titleBox = page.getByRole("textbox", { name: "제목" });
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   await titleBox.fill("다른 초안");
   await editor.fill("남겨 둘 내용");
   await page.goto(`${newPage}?title=${title}`);
@@ -132,7 +133,7 @@ test("새 문서 초안은 대상별로 분리되고 저장 공간이 막혀도 
 test("저장 요청이 실패해도 다시 열어 마지막 입력을 저장할 수 있다", async ({ page }) => {
   const title = `editor-retry-${Date.now()}`;
   await page.goto(newPage);
-  const editor = page.locator(".milkdown .ProseMirror").first();
+  const editor = page.locator(".live-editor .cm-content").first();
   const save = page.getByRole("button", { name: "저장" });
   await page.getByRole("textbox", { name: "제목" }).fill(title);
   await editor.fill("실패 후 재시도할 내용");
@@ -147,4 +148,23 @@ test("저장 요청이 실패해도 다시 열어 마지막 입력을 저장할 
   await save.click();
   await expect(page).toHaveURL(`/s/notice/${title}`);
   await expect(page.getByText("실패 후 재시도할 내용", { exact: true })).toBeVisible();
+});
+
+test("이전 원문 모드 초안도 내용과 버전을 보존해 라이브로 복원한다", async ({ page }) => {
+  await page.goto(newPage);
+  await page.getByRole("textbox", { name: "제목" }).fill("이전 초안");
+  await fillMarkdown(page, "초안 생성");
+  const content = "# 기존 초안  \r\n\r\n~~~js\r\nconst x = 1;\r\n~~~\r\n";
+  const key = await page.evaluate(() => Object.keys(sessionStorage).find(key => key.startsWith("simple-wiki:draft:"))!);
+  await page.addInitScript(({ key, content }) => {
+    sessionStorage.setItem(key, JSON.stringify({ title: "이전 초안", content, mode: "source", expectedVersion: 7 }));
+  }, { key, content });
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "본문", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(라이브|원문)$/ })).toHaveCount(0);
+  await expect(page.getByText("이 탭에 보관한 초안을 복원했습니다.")).toBeVisible();
+  expect(await readMarkdown(page)).toBe(content.replace(/\r\n/g, "\n"));
+  await page.getByRole("textbox", { name: "제목" }).fill("이전 초안 수정");
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)!), key))
+    .toEqual({ title: "이전 초안 수정", content, expectedVersion: 7 });
 });

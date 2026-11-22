@@ -1,6 +1,6 @@
 import { WikiIcon } from "./WikiIcon";
 import { SidebarFrame } from "./SidebarFrame";
-import Link from "next/link";
+import { NavigationLink as Link } from "./NavigationLink";
 import { NavLink } from "@/components/NavLink";
 import { SidebarDocs } from "@/components/SidebarDocs";
 import { SidebarResizer } from "@/components/SidebarResizer";

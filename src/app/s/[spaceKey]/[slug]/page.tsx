@@ -1,12 +1,15 @@
 import { Disclosure } from "@/components/Disclosure";
 import { WikiIcon } from "@/components/WikiIcon";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/NavigationLink";
 import { listReadableSpaces, requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { getSpaceTree } from "@/lib/space-tree";
 import { getBacklinks } from "@/lib/wiki-link-destinations";
 import { WikiArticle } from "@/components/WikiArticle";
+import { ArticleToc } from "@/components/ArticleToc";
+import { DocumentLayout } from "@/components/DocumentLayout";
+import { DocumentSource } from "@/components/DocumentSource";
 import { getRenderedPage } from "@/lib/page-render-cache";
 import { deletePage, movePage } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
@@ -80,17 +83,20 @@ export default async function PageView({
   const documentUrl = `/s/${spaceKey}/${encodeURIComponent(slug)}`;
 
   return (
-    <main className="document">
+    <DocumentLayout sections={article.sections}>
       {error && <div className="notice notice-warn" role="alert">{error}</div>}
       <div className="document-toolbar">
         <Link href={`/s/${spaceKey}`} className="document-path">
           <WikiIcon name="book" /><span>{space.name}</span>
         </Link>
-        {canEdit ? (
-          <div className="document-actions">
-            <Link href={`${documentUrl}/edit`} className="btn btn-ghost"><WikiIcon name="edit" />편집</Link>
-            <Disclosure label="문서 더보기" trigger={<WikiIcon name="more" />}>
-              <Link href={`${documentUrl}/history`}>이력</Link>
+        <div className="document-actions">
+          {canEdit
+            ? <Link href={`${documentUrl}/edit`} className="btn btn-ghost"><WikiIcon name="edit" />편집</Link>
+            : <Link href={`${documentUrl}/history`} className="btn btn-ghost">이력</Link>}
+          <Disclosure label="문서 더보기" trigger={<WikiIcon name="more" />}>
+            {canEdit && <Link href={`${documentUrl}/history`}>이력</Link>}
+            <DocumentSource source={page.content} title={page.title} />
+            {canEdit && <>
               <Link href={`/s/${spaceKey}/new?parent=${encodeURIComponent(slug)}`}>하위 문서</Link>
               <details className="move" data-parent={currentParentSlug}>
                 <summary className="menu-item" aria-label="이동할 위치">
@@ -117,19 +123,22 @@ export default async function PageView({
               <form action={deletePage.bind(null, spaceKey, slug)}>
                 <ConfirmSubmitButton message="이 문서를 휴지통으로 옮길까요? 휴지통에서 복원할 수 있습니다." className="menu-item danger-text">삭제</ConfirmSubmitButton>
               </form>
-            </Disclosure>
-          </div>
-        ) : <Link href={`${documentUrl}/history`} className="btn btn-ghost">이력</Link>}
+            </>}
+          </Disclosure>
+        </div>
       </div>
 
       <header className="document-heading">
         <h1 className="document-title">{page.title}</h1>
-        <p className="document-meta">
-          마지막 수정 <time dateTime={page.updatedAt.toISOString()}>{page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}</time>
-          <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
-        </p>
+        <div className="document-meta-row">
+          <p className="document-meta">
+            마지막 수정 <time dateTime={page.updatedAt.toISOString()}>{page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}</time>
+            <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
+          </p>
+          <ArticleToc sections={article.sections} compact />
+        </div>
       </header>
-      <WikiArticle {...article} source={page.content} />
+      <WikiArticle html={article.html} />
       <div className="document-reactions">
         <LikeButton spaceKey={spaceKey} slug={slug} count={likeState.count} liked={likeState.liked} />
       </div>
@@ -180,6 +189,6 @@ export default async function PageView({
           <CommentForm spaceKey={spaceKey} slug={slug} />
         </div>
       </section>
-    </main>
+    </DocumentLayout>
   );
 }

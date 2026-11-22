@@ -14,7 +14,7 @@ test("모바일에서 문서 트리로 이동하고 긴 제목을 편집한다",
 
   const title = page.getByRole("textbox", { name: "제목" });
   await title.fill("모바일 화면에서 여러 줄로 표시되는 엔지니어링 문서 편집 가이드");
-  await expect(page.locator(".ProseMirror").first()).toBeVisible();
+  await expect(page.locator(".cm-content").first()).toBeVisible();
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);

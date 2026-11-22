@@ -14,7 +14,7 @@ export function documentUrl(spaceKey: string, slug: string) {
 
 export function linkedPageSlugs(content: string, source: URL, targetSpaceKey: string, options: WikiLinkOptions) {
   const tree = parser.parse(content);
-  remarkWikiLinks(options)(tree);
+  remarkWikiLinks(options)(tree, { value: content });
   const linked = new Set<string>();
   visit(toHtml.runSync(tree), "element", node => {
     if (node.tagName !== "a" || typeof node.properties.href !== "string") return;

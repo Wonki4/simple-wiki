@@ -89,3 +89,16 @@ it("읽을 수 있는 대상이 누락된 경우와 접근할 수 없는 스페�
     null,
   ]);
 });
+
+it("이스케이프와 문자 엔티티로 작성한 대괄호는 링크나 백링크로 해석하지 않는다", async () => {
+  const source = String.raw`\[[문서]] &#91;&#91;문서]] [[문서]] \\[[문서]]`;
+  expect(extractWikiLinks(source)).toHaveLength(1);
+  const html = await render(source, new Set(["문서"]));
+  expect(html.match(/class="wiki-link"/g)).toHaveLength(2);
+  expect(html).toContain("[[문서]]");
+});
+
+it("인용문의 이어지는 줄과 엔티티를 포함한 이름에서도 원문 위치를 구분한다", () => {
+  const source = "> 줄\n> \\[[제외]] [[A &amp; B]]\n> [[포함]]";
+  expect(extractWikiLinks(source).map(link => link.target)).toEqual(["A & B", "포함"]);
+});
