@@ -27,7 +27,7 @@ export default async function NewSpacePage() {
           <label className="field">
             <span>공개 범위</span>
             <select name="visibility" className="select">
-              <option value="organization">전사 공개 (로그인 사용자 모두 읽기)</option>
+              <option value="organization">전체 공개 (로그인 사용자 모두 읽기)</option>
               <option value="restricted">제한 (권한 부여된 대상만)</option>
             </select>
           </label>

@@ -96,6 +96,7 @@ export async function requireApiSpaceRole(
   req: NextRequest,
   spaceKey: string,
   required: SpaceRole,
+  options?: { actorPermissionsOnly?: boolean },
 ): Promise<SpaceAuthOk | SpaceAuthErr> {
   const actor = await resolveApiActor(req);
   if (!actor) {
@@ -105,7 +106,10 @@ export async function requireApiSpaceRole(
   if (limited) return { ok: false, response: limited };
   const space = await prisma.space.findUnique({
     where: { key: spaceKey },
-    include: { permissions: true },
+    include: { permissions: options?.actorPermissionsOnly ? { where: { OR: [
+      { subjectType: "user", subjectRef: actor.userId },
+      { subjectType: "group", subjectRef: { in: actor.groups } },
+    ] } } : true },
   });
   if (!space) {
     return { ok: false, response: Response.json({ error: "스페이스가 없습니다." }, { status: 404 }) };

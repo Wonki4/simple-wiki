@@ -78,28 +78,30 @@ test("wiki-admin: 스페이스 생성과 권한 부여", async ({ page }) => {
   await page.getByRole("button", { name: "만들기" }).click();
   await expect(page.getByRole("heading", { name: "E2E 문서" })).toBeVisible();
 
-  // 그룹 대상은 이제 드롭다운 — 먼저 /groups에서 hr 그룹을 만든다.
+  // 그룹과 사용자를 같은 검색창에서 선택한다.
   await page.goto("/groups");
   await page.locator('input[name="name"]').fill("hr");
   await page.getByRole("button", { name: "그룹 만들기" }).click();
   await expect(page.locator("section", { hasText: "hr" }).first()).toBeVisible();
 
   await page.goto("/s/e2e-docs/settings");
-  const groupForm = page.locator('form:has(select[name="groupId"])');
-  await groupForm.locator('select[name="groupId"]').selectOption({ label: "hr" });
-  await groupForm.locator('select[name="role"]').selectOption("viewer");
-  await groupForm.getByRole("button", { name: "그룹 권한 추가" }).click();
+  const permissionForm = page.getByRole("form", { name: "권한 추가", exact: true });
+  const target = permissionForm.getByRole("combobox", { name: "사용자 또는 그룹" });
+  await target.fill("hr");
+  await page.getByRole("option", { name: /그룹 hr/ }).click();
+  await permissionForm.getByLabel("역할").selectOption("viewer");
+  await permissionForm.getByRole("button", { name: "권한 추가", exact: true }).click();
   await expect(page.getByRole("cell", { name: "hr" })).toBeVisible();
 
-  // 없는 사용자는 크래시 대신 경고 배너 + 서버 로그
-  const userForm = page.locator('form:has(input[name="email"])');
-  await userForm.locator('input[name="email"]').fill("nobody@example.com");
-  await userForm.getByRole("button", { name: "사용자 권한 추가" }).click();
-  await expect(page.locator(".notice-warn").filter({ hasText: "사용자가 없습니다" })).toBeVisible();
+  // 검색 결과가 없으면 저장할 수 없다.
+  await target.fill("nobody@example.com");
+  await expect(permissionForm.getByText(/검색 결과가 없습니다/)).toBeVisible();
+  await expect(permissionForm.getByRole("button", { name: "권한 추가", exact: true })).toBeDisabled();
 
   // Keycloak 아이디로 추가 — alice는 첫 테스트에서 로그인해 username이 채워져 있다
-  await userForm.locator('input[name="email"]').fill("alice");
-  await userForm.getByRole("button", { name: "사용자 권한 추가" }).click();
+  await target.fill("alice");
+  await page.getByRole("option").filter({ hasText: "alice@example.com" }).click();
+  await permissionForm.getByRole("button", { name: "권한 추가", exact: true }).click();
   await expect(page.getByRole("cell", { name: /alice@example.com/ })).toBeVisible();
 });
 
