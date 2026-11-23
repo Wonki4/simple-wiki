@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { auth, signIn, signOut } from "@/auth";
 import { SearchBox } from "@/components/SearchBox";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export async function Header() {
   const session = await auth();
@@ -20,7 +21,7 @@ export async function Header() {
         </Link>
         <SearchBox />
         {session?.user ? (
-          <Disclosure label="계정 메뉴" trigger={<WikiIcon name="account" />} className="account-menu">
+          <Disclosure label="계정 메뉴" trigger={<UserAvatar name={session.user.name || ""} imageUrl={session.user.image} size="md" />} className="account-menu">
             <Link href="/me" className="userbar__name" title="마이페이지">
               {session.user.name}
             </Link>
