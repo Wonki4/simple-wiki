@@ -17,6 +17,7 @@
 - **첨부파일** — 이미지 붙여넣기·드래그와 파일 첨부를 지원합니다. 여러 파일 중 일부가 실패하면 편집기에 파일명과 원인을 표시하고, 실패한 파일만 다시 올릴 수 있습니다. 스페이스 권한으로 접근 통제, SVG는 첨부(attachment)로 강제 다운로드.
 - 스페이스 홈의 **첨부파일**에서 파일 이름으로 검색하고 그 파일을 사용하는 문서로 이동할 수 있습니다. 사용처는 같은 스페이스에 있는 문서의 현재 본문을 기준으로 표시합니다.
 - **좋아요 · 마이페이지 · 댓글** — 페이지 좋아요(하트), 마이페이지(`/me`)에서 좋아요한 글 목록, 페이지 하단 댓글.
+- **작성자 · 프로필 이미지** — 문서 제목 아래에 최초 작성자와 마지막 수정 시각을 표시합니다. 작성자·댓글·계정 메뉴의 사진은 Keycloak에서 연동하며, 사진이 없거나 로드에 실패하면 이름 첫 글자로 표시합니다.
 - **LLM/API 편집 표시** — 개인 액세스 토큰(봇)으로 만든/수정한 문서는 문서 상단·이력에 `🤖 토큰이름` 뱃지.
 - **API · 개인 액세스 토큰(PAT) · MCP 서버** — LLM이 위키를 읽고(검색/조회) 쓸(생성/수정) 수 있음. → [`mcp-server/`](mcp-server/README.md)
 
@@ -55,6 +56,17 @@ npm run dev                   # http://localhost:3000
 | `bob` | `bob1234` | 그룹 없음 (전체 공개 스페이스만 열람) |
 
 Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
+
+### Keycloak 프로필 이미지
+
+위키에 별도 사진 업로드 기능은 없으며, 로그인할 때 OIDC `picture` 클레임을 사용자 DB와 세션에 저장합니다. 사진 변경·삭제는 다음 로그인 때 반영됩니다. 문서 작성자는 최초 작성자를 유지합니다.
+
+- Keycloak의 **Realm Settings → User profile**에 선택 항목 `picture`를 등록하고, 사용자의 속성에 이미지 URL을 입력합니다. 외부 IdP를 쓰면 그 IdP의 사진을 같은 속성으로 매핑합니다.
+- 위키 클라이언트에 연결된 `profile` 스코프의 mapper가 `picture`를 **ID token**에 포함하는지 확인합니다. 없으면 **User Attribute** mapper를 추가합니다: `User Attribute=picture`, `Token Claim Name=picture`, `Claim JSON Type=String`, `Add to ID token=On`. UserInfo도 사용하면 해당 옵션을 켭니다.
+- URL은 브라우저에서 직접 열 수 있는 `https://` 이미지 주소를 권장합니다(로컬·사내 HTTP 환경도 지원). 별도 Bearer 헤더가 필요한 이미지 API는 사용할 수 없습니다. Keycloak 속성 검증으로 조직이 관리하는 이미지 호스트만 허용할 수 있습니다. 위키는 이미지 요청에 문서 주소를 Referer로 보내지 않으며 서버에서 이미지를 프록시하지 않습니다.
+- 기존 DB에는 `npx prisma migrate deploy`로 `User.imageUrl` 컬럼을 추가합니다. 기존 사용자는 다음 로그인 전까지 이름 첫 글자가 표시됩니다.
+
+설정 참고: [Keycloak의 프로필 이미지 문서](https://www.keycloak.org/ui-customization/avatars).
 
 ## 권한 모델
 

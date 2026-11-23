@@ -20,6 +20,7 @@ import { getLikeState } from "@/lib/likes";
 import { listComments } from "@/lib/comments";
 import { deleteComment } from "@/actions/comments";
 import { CommentForm } from "@/components/CommentForm";
+import { UserAvatar } from "@/components/UserAvatar";
 import { buildTree, flattenTree, selfAndDescendantIds } from "@/lib/page-tree";
 
 export default async function PageView({
@@ -58,8 +59,15 @@ export default async function PageView({
     );
   }
 
-  const likeState = await getLikeState(page.id, session.userId);
-  const comments = await listComments(page.id);
+  const [author, likeState, comments] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: page.createdById },
+      select: { name: true, username: true, imageUrl: true },
+    }),
+    getLikeState(page.id, session.userId),
+    listComments(page.id),
+  ]);
+  const authorName = author?.name.trim() || author?.username?.trim() || "알 수 없음";
   const canModerate = hasRole(role, "admin");
   const readable = await listReadableSpaces(session);
   const article = await getRenderedPage({
@@ -132,10 +140,19 @@ export default async function PageView({
       <header className="document-heading">
         <h1 className="document-title">{page.title}</h1>
         <div className="document-meta-row">
-          <p className="document-meta">
-            마지막 수정 <time dateTime={page.updatedAt.toISOString()}>{page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}</time>
-            <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
-          </p>
+          <div className="document-meta-stack">
+            <p className="document-author">
+              작성자
+              <span className="document-author__identity">
+                <UserAvatar name={authorName} imageUrl={author?.imageUrl} />
+                <span>{authorName}</span>
+              </span>
+            </p>
+            <p className="document-meta">
+              마지막 수정 <time dateTime={page.updatedAt.toISOString()}>{page.updatedAt.toISOString().slice(0, 16).replace("T", " ")}</time>
+              <EditSourceBadge source={page.updatedSource} label={page.updatedViaLabel} />
+            </p>
+          </div>
           <ArticleToc sections={article.sections} compact />
         </div>
       </header>
@@ -154,7 +171,10 @@ export default async function PageView({
           {comments.map((c) => (
             <li key={c.id} className="comment">
               <div className="comment__head">
-                <span className="comment__author">{c.authorName}</span>
+                <span className="comment__author">
+                  <UserAvatar name={c.authorName} imageUrl={c.authorImageUrl} />
+                  <span>{c.authorName}</span>
+                </span>
                 <span className="comment__time">
                   {c.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                 </span>
