@@ -50,12 +50,21 @@ test("HTML Viewer는 첫 저장 방법을 안내하고, 저장 후에도 원문 
     await expect(reader.getByRole("heading", { name: title, exact: true })).toBeVisible();
     const emptyViewer = reader.getByRole("region", { name: "아직 저장된 HTML이 없습니다" });
     await expect(emptyViewer).toContainText("편집자에게");
-    await expect(emptyViewer).toContainText(`/s/${key}/${slug}`);
-    await expect(emptyViewer).toContainText("save_page_html");
+    const example = await emptyViewer.getByRole("blockquote").innerText();
+    expect(example).toContain(`/s/${key}/${slug}`);
+    expect(example).toContain("save_page_html");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(reader.url()).origin });
+    await emptyViewer.getByRole("button", { name: "요청 복사", exact: true }).click();
+    await expect(emptyViewer.getByRole("status")).toContainText("복사했습니다");
+    expect(await reader.evaluate(() => navigator.clipboard.readText())).toBe(example);
     await expect(reader.locator("iframe")).toHaveCount(0);
     await page.goto(`${url}/html`);
     await expect(page.getByRole("region", { name: "아직 저장된 HTML이 없습니다" }))
       .toContainText("위키 MCP에 연결한 에이전트에게");
+    await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { value: undefined }); });
+    await page.getByRole("button", { name: "요청 복사" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "직접 복사" })).toBeVisible();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(example);
     const first = { baseVersion: doc.version, html: "<h1>첫 번째 보고서</h1>" };
     const otherSpace = await db.space.create({ data: { key: otherKey, name: "토큰 범위 테스트", visibility: "restricted" } });
     const readOnly = temporaryToken(space.id, true);
@@ -79,6 +88,7 @@ test("HTML Viewer는 첫 저장 방법을 안내하고, 저장 후에도 원문 
     await expect(reader).toHaveURL(previewUrl);
     const frame = reader.frameLocator("iframe");
     await expect(frame.getByRole("heading", { name: "첫 번째 보고서" })).toBeVisible();
+    await expect(reader.getByRole("button", { name: "요청 복사", exact: true })).toHaveCount(0);
     await expect(reader.locator("iframe")).toHaveAttribute("title", `${title} HTML Viewer`);
     await expect(reader.locator("iframe")).toHaveAttribute("sandbox", "");
 

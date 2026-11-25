@@ -12,12 +12,18 @@
   overflow-wrap: anywhere;
 }
 .empty p { margin-top: .5rem; color: var(--ink-2); }
-.empty blockquote {
+.requestExample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .65rem 1rem;
   margin-top: 1rem;
   padding: .8rem 1rem;
   border-inline-start: 3px solid var(--border-strong);
   background: var(--surface-2);
 }
+.requestExample blockquote { flex: 1 1 18rem; min-width: 0; }
+.copyStatus { color: var(--muted); font-size: .85rem; }
 .empty code { font-family: var(--font-mono); font-size: .93em; }
 .frame {
   display: block;
