@@ -15,6 +15,11 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 3. 문서 원문이 필요하면 get_page(space, slug) — 응답의 version을 기억합니다.
 4. 새 문서는 create_page, 같은 제목이 있으면 409 → update_page로 전환합니다.
 
+스페이스 타임라인
+- create_page, update_page, append_to_page, replace_in_page, revert_page가 성공하면 같은 작업에서 응답의 slug와 version으로 save_page_timeline을 호출합니다. 부분 수정이나 복원은 먼저 get_page(space, slug, version)로 그 버전의 원문을 확인하세요.
+- 실제 채택·번복이 명시된 사항은 decision, 회의에서 제안·검토 중인 사항은 discussion입니다. 원문의 근거 문장을 그대로 인용하고 한 줄로 요약합니다. 명시된 회의일만 YYYY-MM-DD로 보냅니다. 관련 내용이 없는 버전은 entries: []로 처리하세요.
+- 과거 기록 정리를 요청받으면 list_timeline_sources의 from/to에 한국 날짜를 지정합니다. 각 버전의 원문은 get_page(version)로 읽습니다. 다음 묶음은 같은 기간에 nextCursor를 cursor로 전달하고 nextCursor가 null이면 완료합니다.
+
 HTML Viewer
 - 사용자가 위키 문서를 HTML로 만들어 달라고 하면 get_page로 최신 원문과 version을 읽고, 내용에 맞는 HTML과 CSS를 작성합니다. 표·그래프·접기 등을 넣을 수 있습니다. HTML Viewer는 스크립트와 외부 리소스 요청을 차단합니다.
 - save_page_html(space, slug, baseVersion, html)에 읽은 version을 전달하고, 응답의 previewUrl을 사용자에게 HTML Viewer 링크로 안내합니다. 다시 저장하면 이전 HTML을 교체하고 마크다운 원문과 이력은 보존합니다.
@@ -255,6 +260,50 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
   );
 
   server.registerTool(
+    "save_page_timeline",
+    {
+      title: "문서 버전의 논의·결정 기록",
+      description: "문서를 저장한 에이전트가 해당 버전에서 확인한 논의와 결정을 스페이스 타임라인에 기록합니다. 같은 버전을 다시 보내면 그 버전의 항목 전체를 교체합니다. 편집 권한이 필요합니다.",
+      inputSchema: {
+        space: z.string().min(1).describe("스페이스 키"),
+        slug: z.string().min(1).describe("원문 문서 slug"),
+        version: z.number().int().positive().describe("근거를 읽은 문서 버전"),
+        entries: z.array(z.object({
+          kind: z.enum(["discussion", "decision"]).describe("제안·검토는 discussion, 명시적으로 채택하거나 번복한 사항은 decision"),
+          summary: z.string().trim().min(1).max(240).describe("무엇을 논의하거나 결정했는지 설명하는 한 줄"),
+          evidence: z.string().min(1).max(2000).describe("해당 버전의 마크다운 본문에서 그대로 인용한 문장"),
+          date: z.string().date().optional().describe("원문에 명시된 실제 회의·결정일 YYYY-MM-DD. 확인할 수 없으면 생략"),
+        })).max(50).describe("해당 버전에 기록할 전체 항목. 해당 사항이 없으면 빈 배열"),
+      },
+    },
+    async ({ space, slug, version, entries }) => toResult(await api(
+      `/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/timeline`,
+      { method: "PUT", body: JSON.stringify({ version, entries }) },
+    )),
+  );
+
+  server.registerTool(
+    "list_timeline_sources",
+    {
+      title: "기간 내 미처리 문서 버전",
+      description: "선택한 기간에 저장했고 아직 타임라인을 정리하지 않은 버전을 오래된 순서로 조회합니다. 각 원문은 get_page(space, slug, version)로 읽습니다.",
+      inputSchema: {
+        space: z.string().min(1).describe("스페이스 키"),
+        from: z.string().date().describe("시작일 YYYY-MM-DD (한국 날짜, 포함)"),
+        to: z.string().date().describe("종료일 YYYY-MM-DD (한국 날짜, 포함)"),
+        limit: z.number().int().min(1).max(20).optional().describe("한 번에 읽을 버전 수. 기본 5"),
+        cursor: z.string().min(1).optional().describe("같은 기간의 직전 응답에서 받은 nextCursor"),
+      },
+    },
+    async ({ space, from, to, limit, cursor }) => {
+      const params = new URLSearchParams({ from, to });
+      if (limit !== undefined) params.set("limit", String(limit));
+      if (cursor !== undefined) params.set("cursor", cursor);
+      return toResult(await api(`/api/spaces/${encodeURIComponent(space)}/timeline/sources?${params}`));
+    },
+  );
+
+  server.registerTool(
     "save_page_html",
     {
       title: "HTML Viewer에 문서 저장",
@@ -297,7 +346,7 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
     {
       title: "페이지 생성",
       description:
-        "새 마크다운 페이지를 만듭니다(editor 권한 필요). slug는 제목에서 자동 생성됩니다. 같은 제목이 있으면 실패(409)합니다.",
+        "새 마크다운 페이지를 만듭니다(editor 권한 필요). 같은 제목이 있으면 409입니다. 성공하면 응답의 slug·version으로 save_page_timeline을 호출해 논의와 결정을 기록하세요.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
         title: z.string().describe("페이지 제목"),
@@ -319,7 +368,7 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
     {
       title: "페이지 수정",
       description:
-        "기존 페이지 전체 본문을 교체합니다(editor 권한). expectedVersion을 주면 그사이 변경 시 409로 실패합니다. 새 리비전이 이력에 남습니다.",
+        "기존 페이지 전체 본문을 교체합니다(editor 권한). expectedVersion을 주면 그사이 변경 시 409로 실패합니다. 저장한 version으로 save_page_timeline을 호출하세요.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
         slug: z.string().describe("수정할 페이지 slug"),

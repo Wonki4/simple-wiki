@@ -170,7 +170,7 @@ export default async function PageView({
         </h2>
         <ul className="comment-list mt-4">
           {comments.map((c) => (
-            <li key={c.id} className="comment">
+            <li key={c.id} id={`comment-${c.id}`} className="comment">
               <div className="comment__head">
                 <span className="comment__author">
                   <UserAvatar name={c.authorName} imageUrl={c.authorImageUrl} />
