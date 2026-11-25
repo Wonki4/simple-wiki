@@ -19,12 +19,12 @@ function temporaryToken(spaceId: string, readOnly: boolean) {
 
 // A different user reads the editor's HTML through the returned preview URL.
 // The same URL must stop revealing the draft when access is revoked or the page is trashed.
-test("HTML을 저장하고 교체해도 원문 이력을 보존하고, 미리보기는 현재 열람 권한을 따른다", async ({ page, browser, request }) => {
+test("HTML Viewer는 첫 저장 방법을 안내하고, 저장 후에도 원문 이력과 열람 권한을 보존한다", async ({ page, browser, request }) => {
   test.setTimeout(120_000);
   const key = `preview-${randomUUID()}`;
   const otherKey = `${key}-other`;
   const tokenOwnerId = randomUUID();
-  const space = await db.space.create({ data: { key, name: "HTML 미리보기 테스트", visibility: "restricted" } });
+  const space = await db.space.create({ data: { key, name: "HTML Viewer 테스트", visibility: "restricted" } });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     await login(page, "wiki-admin", "admin1234");
@@ -43,7 +43,19 @@ test("HTML을 저장하고 교체해도 원문 이력을 보존하고, 미리보
     const doc = await (await page.request.get(pageApi)).json();
     const before = await (await page.request.get(`${pageApi}/revisions`)).json();
     await reader.goto(url);
-    await expect(reader.getByRole("link", { name: "HTML 미리보기", exact: true })).toHaveCount(0);
+    const viewerLink = reader.getByRole("link", { name: "HTML Viewer", exact: true });
+    await expect(viewerLink).toHaveAttribute("href", `${url}/html`);
+    await viewerLink.click();
+    await expect(reader).toHaveURL(`${url}/html`);
+    await expect(reader.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    const emptyViewer = reader.getByRole("region", { name: "아직 저장된 HTML이 없습니다" });
+    await expect(emptyViewer).toContainText("편집자에게");
+    await expect(emptyViewer).toContainText(`/s/${key}/${slug}`);
+    await expect(emptyViewer).toContainText("save_page_html");
+    await expect(reader.locator("iframe")).toHaveCount(0);
+    await page.goto(`${url}/html`);
+    await expect(page.getByRole("region", { name: "아직 저장된 HTML이 없습니다" }))
+      .toContainText("위키 MCP에 연결한 에이전트에게");
     const first = { baseVersion: doc.version, html: "<h1>첫 번째 보고서</h1>" };
     const otherSpace = await db.space.create({ data: { key: otherKey, name: "토큰 범위 테스트", visibility: "restricted" } });
     const readOnly = temporaryToken(space.id, true);
@@ -64,10 +76,10 @@ test("HTML을 저장하고 교체해도 원문 이력을 보존하고, 미리보
     const { previewUrl } = await result.json();
     expect(previewUrl).toBe(`${url}/html`);
     await reader.reload();
-    await reader.getByRole("link", { name: "HTML 미리보기", exact: true }).click();
     await expect(reader).toHaveURL(previewUrl);
     const frame = reader.frameLocator("iframe");
     await expect(frame.getByRole("heading", { name: "첫 번째 보고서" })).toBeVisible();
+    await expect(reader.locator("iframe")).toHaveAttribute("title", `${title} HTML Viewer`);
     await expect(reader.locator("iframe")).toHaveAttribute("sandbox", "");
 
     const html = '<!doctype html><html lang="ko"><head><style>.result { color: rgb(23, 81, 65) }</style></head><body><h1 class="result">권한 검색 결과</h1><details><summary>측정값</summary><p>64.6 ms</p></details></body></html>';
@@ -86,7 +98,7 @@ test("HTML을 저장하고 교체해도 원문 이력을 보존하고, 미리보
     expect(outdated.status()).toBe(409);
     expect(await outdated.json()).toMatchObject({ currentVersion: doc.version + 1 });
     await reader.reload();
-    await expect(reader.getByRole("status").filter({ hasText: "미리보기" })).toContainText(`현재 문서는 v${doc.version + 1}`);
+    await expect(reader.getByRole("status").filter({ hasText: `현재 문서는 v${doc.version + 1}` })).toBeVisible();
     await expect(frame.getByRole("heading", { name: "권한 검색 결과" })).toBeVisible();
     await db.spacePermission.delete({ where: { id: grant.id } });
     await reader.reload();

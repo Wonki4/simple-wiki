@@ -5,6 +5,20 @@
 .heading p { color: var(--muted); font-size: .75rem; }
 .heading h1 { overflow-wrap: anywhere; font-size: 1.1rem; font-weight: 600; }
 .revision { color: var(--link); text-decoration: underline; }
+.empty {
+  max-width: 42rem;
+  margin: clamp(2rem, 8vh, 5rem) auto;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.empty p { margin-top: .5rem; color: var(--ink-2); }
+.empty blockquote {
+  margin-top: 1rem;
+  padding: .8rem 1rem;
+  border-inline-start: 3px solid var(--border-strong);
+  background: var(--surface-2);
+}
+.empty code { font-family: var(--font-mono); font-size: .93em; }
 .frame {
   display: block;
   width: 100%;

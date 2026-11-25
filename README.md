@@ -19,7 +19,7 @@
 - **좋아요 · 마이페이지 · 댓글** — 페이지 좋아요(하트), 마이페이지(`/me`)에서 좋아요한 글 목록, 페이지 하단 댓글.
 - **작성자 · 프로필 이미지** — 문서 제목 아래에 최초 작성자와 마지막 수정 시각을 표시합니다. 작성자·댓글·계정 메뉴의 사진은 Keycloak에서 연동하며, 사진이 없거나 로드에 실패하면 이름 첫 글자로 표시합니다.
 - **LLM/API 편집 표시** — 개인 액세스 토큰(봇)으로 만든/수정한 문서는 문서 상단·이력에 `🤖 토큰이름` 뱃지.
-- **에이전트가 디자인한 HTML 미리보기** — 에이전트가 `get_page`로 읽은 마크다운을 HTML·CSS로 구성하고 `save_page_html`에 원문 버전과 함께 제출하면 브라우저에서 열 수 있는 링크를 받습니다. 독자는 문서의 **HTML 미리보기**에서도 같은 결과를 열 수 있습니다. 마크다운과 편집 이력은 유지되며, 원문이 바뀌면 이전 버전으로 만든 미리보기임을 표시합니다.
+- **HTML Viewer** — 모든 문서에서 열 수 있습니다. 저장된 HTML이 없으면 위키 MCP에 연결한 에이전트에게 어떻게 요청할지 안내합니다. 에이전트는 `get_page`로 원문을 읽고 HTML과 CSS를 작성한 뒤 `save_page_html`로 저장합니다. 마크다운과 편집 이력은 유지되며, 원문이 바뀌면 HTML Viewer에 기준 버전과 현재 버전이 함께 표시됩니다.
 - **API · 개인 액세스 토큰(PAT) · MCP 서버** — LLM이 위키를 읽고(검색/조회) 쓸(생성/수정) 수 있음. → [`mcp-server/`](mcp-server/README.md)
 
 ## 기술 스택
@@ -83,7 +83,7 @@ Keycloak 관리 콘솔: http://localhost:8080 (admin/admin)
 - **REST API**: `Authorization: Bearer swk_...`
   - `GET /api/spaces` · `GET /api/spaces/{key}/pages` · `GET /api/spaces/{key}/pages/{slug}`
   - `POST /api/spaces/{key}/pages` · `PUT .../{slug}` · `DELETE .../{slug}` (editor)
-  - `PUT /api/spaces/{key}/pages/{slug}/html` (editor) — `{ "baseVersion": 3, "html": "<h1>보고서</h1>" }`. HTML은 UTF-8 기준 최대 512 KiB입니다. 최신 원문 버전과 다르면 409를 반환합니다. 성공하면 해당 문서의 미리보기 한 건을 교체하고 `baseVersion`과 `previewUrl`을 반환합니다. 미리보기 링크에도 문서 열람 권한이 필요합니다.
+  - `PUT /api/spaces/{key}/pages/{slug}/html` (editor) — `{ "baseVersion": 3, "html": "<h1>보고서</h1>" }`. HTML은 UTF-8 기준 최대 512 KiB입니다. 최신 원문 버전과 다르면 409를 반환합니다. 성공하면 HTML을 저장하고 `baseVersion`과 HTML Viewer 주소인 `previewUrl`을 반환합니다. 같은 문서에 다시 저장하면 이전 HTML을 교체합니다. 링크를 열려면 문서 열람 권한이 필요합니다.
   - `GET /api/search?q=배포&space=eng&page=2` — `space` 생략 시 읽을 수 있는 전체 스페이스. 페이지당 50건이며 `results`와 함께 `page`, `pageSize`, `total`, `totalPages`를 반환합니다. 범위를 넘긴 페이지는 마지막 페이지로 맞춥니다.
 - **MCP 서버**: `list_spaces`·`list_pages`·`search_pages`·`get_page`·`create_page`·`update_page`·`delete_page` 도구 제공.
   로컬(stdio) / 원격(streamable-http) 모두 지원. 설치·등록은 [`mcp-server/README.md`](mcp-server/README.md).
