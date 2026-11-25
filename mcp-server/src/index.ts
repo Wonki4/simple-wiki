@@ -12,7 +12,7 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-const server = createWikiMcpServer(TOKEN, BASE);
+const server = createWikiMcpServer(TOKEN, BASE, process.env.WIKI_PUBLIC_URL);
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error(`simple-wiki MCP 서버(stdio) 시작 (${BASE.replace(/\/$/, "")})`);

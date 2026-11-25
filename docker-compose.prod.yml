@@ -96,6 +96,7 @@ services:
     restart: unless-stopped
     environment:
       WIKI_BASE_URL: http://app:3000
+      WIKI_PUBLIC_URL: ${AUTH_URL:-http://localhost:3000}
       HOST: 0.0.0.0
       PORT: "3333"
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}

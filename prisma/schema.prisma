@@ -169,6 +169,7 @@ model Page {
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
   revisions    PageRevision[]
+  htmlPreview  PageHtml?
   deletedAt    DateTime?
   deletedById  String?
   deletedSlug  String? // 삭제 전 주소. 휴지통에 있는 동안에는 같은 주소로 새 문서를 만들 수 있다.
@@ -182,6 +183,15 @@ model Page {
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_title_trgm_idx")
   @@index([content(ops: raw("gin_trgm_ops"))], type: Gin, map: "Page_content_trgm_idx")
   @@index([parentId])
+}
+
+// A separate agent-designed view of one Markdown revision.
+model PageHtml {
+  pageId      String   @id
+  page        Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  baseVersion Int
+  html        String
+  updatedAt   DateTime @updatedAt
 }
 
 model PageRevision {

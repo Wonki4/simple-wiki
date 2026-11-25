@@ -49,6 +49,14 @@ assert.ok(found.results.some(r => r.slug === slug && r.spaceKey === "eng"));
 const got = await call("get_page", { space: "eng", slug });
 console.log("\n[get_page %s] isError=%s\n%s", slug, got.isError, got.text.slice(0, 180));
 
+assert.ok(!got.isError);
+const baseVersion = JSON.parse(got.text).version;
+const previewInput = { space: "eng", slug, baseVersion, html: "<article><h1>HTML 미리보기</h1></article>" };
+const saved = await call("save_page_html", previewInput);
+assert.ok(!saved.isError, saved.text);
+const preview = new URL(JSON.parse(saved.text).previewUrl);
+assert.equal(preview.pathname, `/s/eng/${encodeURIComponent(slug)}/html`);
+
 const updated = await call("update_page", {
   space: "eng",
   slug,
@@ -56,6 +64,11 @@ const updated = await call("update_page", {
   content: "# MCP 테스트\n\nMCP 서버로 **수정**했습니다.",
 });
 console.log("\n[update_page] isError=%s\n%s", updated.isError, updated.text);
+
+assert.ok(!updated.isError, updated.text);
+const stale = await call("save_page_html", previewInput);
+assert.ok(stale.isError);
+assert.match(stale.text, /HTTP 409/);
 
 const notFound = await call("get_page", { space: "eng", slug: "없는-문서-xyz" });
 console.log("\n[get_page 없는문서] isError=%s (true 기대)\n%s", notFound.isError, notFound.text.slice(0, 120));
