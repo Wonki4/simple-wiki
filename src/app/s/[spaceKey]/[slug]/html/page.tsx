@@ -4,6 +4,7 @@ import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { buildHtmlPreview } from "@/lib/html-preview";
 import { hasRole } from "@/lib/permissions";
+import { HtmlRequestExample } from "./HtmlRequestExample";
 import styles from "./preview.module.css";
 
 export default async function HtmlPreviewPage({ params }: {
@@ -49,9 +50,7 @@ export default async function HtmlPreviewPage({ params }: {
           <p>{hasRole(role, "editor")
             ? "위키 MCP에 연결한 에이전트에게 아래처럼 요청하세요. 저장이 끝나면 이 화면을 새로고침해 결과를 볼 수 있습니다."
             : "이 스페이스의 편집자에게 아래 요청을 전달하세요. 편집자가 위키 MCP에 연결한 에이전트로 HTML을 저장하면 여기에서 볼 수 있습니다."}</p>
-          <blockquote>
-            위키 문서 <code>/s/{space.key}/{slug}</code>의 내용을 HTML로 정리하고 <code>save_page_html</code>로 저장해 줘.
-          </blockquote>
+          <HtmlRequestExample documentPath={`/s/${space.key}/${slug}`} />
         </section>
       )}
     </main>
