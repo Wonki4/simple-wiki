@@ -660,6 +660,8 @@ mark {
 }
 
 /* 댓글 */
+.comment[id] { scroll-margin-top: calc(var(--masthead-h) + 1.5rem); }
+.comment:target { border-inline-start: 2px solid var(--accent); padding-inline-start: .75rem; }
 .comment-list {
   display: flex;
   flex-direction: column;
