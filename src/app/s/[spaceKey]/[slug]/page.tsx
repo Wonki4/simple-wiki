@@ -38,7 +38,6 @@ export default async function PageView({
 
   const page = await prisma.page.findUnique({
     where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
-    include: { htmlPreview: { select: { baseVersion: true } } },
   });
 
   if (!page) {
@@ -100,7 +99,7 @@ export default async function PageView({
           <WikiIcon name="book" /><span>{space.name}</span>
         </Link>
         <div className="document-actions">
-          {page.htmlPreview && <Link href={`${documentUrl}/html`} className="btn btn-ghost">HTML 미리보기</Link>}
+          <Link href={`${documentUrl}/html`} className="btn btn-ghost">HTML Viewer</Link>
           {canEdit
             ? <Link href={`${documentUrl}/edit`} className="btn btn-ghost"><WikiIcon name="edit" />편집</Link>
             : <Link href={`${documentUrl}/history`} className="btn btn-ghost">이력</Link>}

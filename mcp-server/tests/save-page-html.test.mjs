@@ -18,7 +18,7 @@ async function connect(t, publicUrl) {
   return client;
 }
 
-test("공개 주소로 미리보기를 반환하고 사용자 토큰과 HTML을 내부 API로만 전달한다", async t => {
+test("공개 주소로 HTML Viewer 링크를 반환하고 사용자 토큰과 HTML을 내부 API로만 전달한다", async t => {
   const client = await connect(t, "https://wiki.example.com/team/");
   const rest = t.mock.method(globalThis, "fetch", async (url, request) => {
     assert.equal(url, `${apiBase}/api/spaces/eng/pages/${encodeURIComponent(args.slug)}/html`);
@@ -29,6 +29,7 @@ test("공개 주소로 미리보기를 반환하고 사용자 토큰과 HTML을 
   });
   const { tools } = await client.listTools();
   const tool = tools.find(tool => tool.name === "save_page_html");
+  assert.match(tool.title, /HTML Viewer/);
   assert.deepEqual(tool.inputSchema.required.sort(), ["baseVersion", "html", "slug", "space"]);
   const result = await client.callTool({ name: tool.name, arguments: args });
   assert.equal(result.isError, false);

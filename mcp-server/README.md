@@ -18,17 +18,19 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 | `get_page` | 페이지 마크다운 원문 | viewer |
 | `create_page` | 새 페이지 생성 | editor |
 | `update_page` | 페이지 수정(새 리비전) | editor |
-| `save_page_html` | 에이전트가 작성한 HTML을 문서에 저장하고 브라우저에서 열 미리보기 URL을 반환 | editor |
+| `save_page_html` | 에이전트가 작성한 HTML을 문서에 저장하고 HTML Viewer 링크를 반환 | editor |
 | `delete_page` | 문서를 휴지통으로 이동 | editor |
 | `list_trashed_pages` | 스페이스 휴지통 목록 | editor |
 | `restore_trashed_page` | 휴지통 문서를 ID로 복원 | editor |
 
 권한은 발급자의 현재 권한과 토큰의 발급 범위를 함께 적용합니다. 범위 밖 스페이스는 목록과 검색에서 제외되며 직접 조회하면 404가 반환됩니다.
 
-### HTML 미리보기 만들기
+### HTML Viewer에 문서 표시하기
+
+문서를 열고 **HTML Viewer**를 선택하세요. 아직 HTML이 없으면 에이전트에게 보낼 요청 예시가 표시됩니다. 위키 MCP에 연결된 에이전트에게 문서 링크와 함께 “이 문서를 HTML로 만들어 위키에 저장해 줘”라고 요청하면 됩니다. 에이전트에는 해당 스페이스의 편집 권한과 쓰기 가능한 토큰이 필요합니다.
 
 1. `get_page(space, slug)`로 최신 마크다운 원문과 `version`을 읽습니다.
-2. 에이전트가 원문에 맞춰 HTML과 CSS를 작성합니다. 표, CSS 그래프, `<details>` 등을 사용할 수 있습니다. 미리보기에서 스크립트와 외부 리소스 요청은 차단됩니다.
+2. 에이전트가 원문에 맞춰 HTML과 CSS를 작성합니다. 표, CSS 그래프, `<details>` 등을 사용할 수 있습니다. HTML Viewer는 스크립트와 외부 리소스 요청을 차단합니다.
 3. `save_page_html`을 호출합니다. `html`은 UTF-8 기준 최대 512 KiB이고 `baseVersion`은 1단계에서 읽은 버전입니다.
 
 ```json
@@ -40,7 +42,7 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 }
 ```
 
-성공하면 `baseVersion`과 절대 URL인 `previewUrl`을 반환합니다. 사용자가 링크를 열면 위키에서 해당 스페이스의 읽기 권한을 확인합니다. 문서당 미리보기 하나를 보관하므로 다시 저장하면 이전 HTML을 교체합니다. 마크다운 내용과 버전은 그대로 유지됩니다.
+성공하면 `baseVersion`과 HTML Viewer의 절대 주소인 `previewUrl`을 반환합니다. 사용자가 링크를 열면 위키에서 해당 스페이스의 읽기 권한을 확인합니다. 같은 문서에 다시 저장하면 이전 HTML을 교체합니다. 마크다운 내용과 버전은 그대로 유지됩니다.
 
 원문이 먼저 바뀌면 HTTP 409와 현재 버전을 반환합니다. `get_page`로 다시 읽고 변경 사항을 디자인에 반영한 뒤 재시도하세요.
 
@@ -62,7 +64,7 @@ LLM이 도구를 올바른 순서로 조합해 쓰도록 유도됩니다. 별도
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `WIKI_BASE_URL` | `http://localhost:3000` | 위키 주소 |
-| `WIKI_PUBLIC_URL` | `WIKI_BASE_URL` | 사용자가 브라우저로 위키에 접속하는 주소. MCP가 내부 서비스 주소로 API를 호출할 때 지정하면 미리보기 링크에 이 주소를 사용합니다. |
+| `WIKI_PUBLIC_URL` | `WIKI_BASE_URL` | 사용자가 브라우저로 위키에 접속하는 주소. MCP가 내부 서비스 주소로 API를 호출할 때 지정하면 HTML Viewer 링크에 이 주소를 사용합니다. |
 | `WIKI_API_TOKEN` | — | stdio에선 필수. http에선 헤더 없는 요청의 폴백 토큰(선택) |
 | `PORT` | `3333` | (http) 수신 포트 |
 | `HOST` | `127.0.0.1` | (http) 바인드 호스트. 공개 노출 시에만 `0.0.0.0` 지정 |
@@ -161,7 +163,7 @@ claude mcp add --transport http simple-wiki \
 WIKI_API_TOKEN=swk_... node smoke-test.mjs
 ```
 
-스모크 스크립트는 위키 도구를 실제 호출합니다. 별도로 `npm test`는 로컬 위키나 토큰 없이 빌드 후 MCP 호출의 미리보기 URL, 버전 충돌·권한 오류 전달, HTML 크기 제한을 검증합니다.
+스모크 스크립트는 위키 도구를 실제 호출합니다. 별도로 `npm test`는 로컬 위키나 토큰 없이 빌드 후 MCP가 반환하는 HTML Viewer 링크, 버전 충돌·권한 오류 전달, HTML 크기 제한을 검증합니다.
 
 ## 구조
 
