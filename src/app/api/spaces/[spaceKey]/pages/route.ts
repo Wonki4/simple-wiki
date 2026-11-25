@@ -77,6 +77,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
       space: { key: auth.space.key },
       slug: result.slug,
       title: title.trim(),
+      version: 1,
       url: `/s/${spaceKey}/${encodeURIComponent(result.slug)}`,
     },
     { status: 201 },

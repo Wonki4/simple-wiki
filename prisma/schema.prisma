@@ -60,7 +60,7 @@ model Comment {
   body      String
   createdAt DateTime @default(now())
 
-  @@index([pageId])
+  @@index([pageId, createdAt, id])
 }
 
 // 위키 자체 그룹. 스페이스 권한(group 대상)의 subjectRef가 이 id를 가리킨다.
@@ -206,8 +206,35 @@ model PageRevision {
   source    String   @default("web")
   viaLabel  String?  // api일 때 토큰 이름
   createdAt DateTime @default(now())
+  timelineReview TimelineReview?
 
   @@unique([pageId, version])
+  @@index([pageId, createdAt, id])
+}
+
+// A review, including one with no entries, marks this immutable revision as processed.
+model TimelineReview {
+  revisionId String          @id
+  revision   PageRevision    @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  entries    TimelineEntry[]
+}
+
+model TimelineEntry {
+  id           String         @id
+  revisionId   String
+  review       TimelineReview @relation(fields: [revisionId], references: [revisionId], onDelete: Cascade)
+  pageId       String
+  version      Int
+  fingerprint  String
+  kind         String
+  summary      String
+  evidence     String
+  eventDay     DateTime       @db.Date
+  explicitDate Boolean
+
+  @@unique([revisionId, fingerprint])
+  @@index([pageId, fingerprint, version])
+  @@index([pageId, eventDay])
 }
 
 model PageLink {

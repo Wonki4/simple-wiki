@@ -3,6 +3,7 @@ import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { WikiIcon } from "@/components/WikiIcon";
+import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
 
 export default async function SpaceHome({ params }: { params: Promise<{ spaceKey: string }> }) {
   const { spaceKey } = await params;
@@ -19,6 +20,7 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
         <h1 className="document-title">{space.name}</h1>
         {space.description && <p>{space.description}</p>}
       </header>
+      <SpaceCollectionNav spaceKey={space.key} active="documents" />
       <div className="collection-label flex flex-wrap items-center justify-between gap-3">
         <h2>최근 수정한 문서</h2>
         <div className="flex flex-wrap items-center gap-2">

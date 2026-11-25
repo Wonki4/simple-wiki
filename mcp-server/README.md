@@ -19,11 +19,33 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 | `create_page` | 새 페이지 생성 | editor |
 | `update_page` | 페이지 수정(새 리비전) | editor |
 | `save_page_html` | 에이전트가 작성한 HTML을 문서에 저장하고 HTML Viewer 링크를 반환 | editor |
+| `save_page_timeline` | 원문 버전의 회의·논의와 결정을 근거 문장과 함께 저장 | editor |
+| `list_timeline_sources` | 기간 내에 저장한 버전 중 타임라인을 아직 정리하지 않은 버전 조회 | viewer |
 | `delete_page` | 문서를 휴지통으로 이동 | editor |
 | `list_trashed_pages` | 스페이스 휴지통 목록 | editor |
 | `restore_trashed_page` | 휴지통 문서를 ID로 복원 | editor |
 
 권한은 발급자의 현재 권한과 토큰의 발급 범위를 함께 적용합니다. 범위 밖 스페이스는 목록과 검색에서 제외되며 직접 조회하면 404가 반환됩니다.
+
+### 회의록을 스페이스 타임라인에 기록하기
+
+문서를 작성하거나 수정한 에이전트는 같은 작업에서 `save_page_timeline`에 저장 응답의 `version`을 전달합니다. 제안은 `discussion`, 원문에 채택 또는 번복이 명시된 사항은 `decision`으로 보냅니다.
+
+```json
+{
+  "space": "eng", "slug": "운영-회의록", "version": 3,
+  "entries": [{
+    "kind": "decision",
+    "summary": "배포 후 오류율 2%를 롤백 기준으로 채택",
+    "evidence": "배포 후 오류율이 2%를 넘으면 롤백하기로 했다.",
+    "date": "2026-05-08"
+  }]
+}
+```
+
+`evidence`는 지정한 버전의 마크다운 본문에서 그대로 가져옵니다. 회의 날짜가 제목이나 본문에 있을 때만 `date`를 지정하고, 생략하면 버전의 저장일이 적용됩니다. 같은 버전을 다시 처리할 때는 그 버전에 남길 항목 전체를 보내세요. 오탈자 수정 등 기록할 사항이 없으면 `entries: []`로 처리를 마칩니다.
+
+과거 회의록은 타임라인에서 **기간 정리 요청 복사**로 시작할 수 있습니다. `list_timeline_sources(space, from, to)`로 한국 날짜 기준 양 끝 날짜를 포함한 목록을 받고, 각 항목을 `get_page(space, slug, version)`로 읽어 저장합니다. `nextCursor`가 있으면 같은 기간과 커서로 이어서 조회합니다.
 
 ### HTML Viewer에 문서 표시하기
 
