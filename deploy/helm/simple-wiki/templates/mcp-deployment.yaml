@@ -43,6 +43,8 @@ spec:
               value: "3333"
             - name: WIKI_BASE_URL
               value: {{ include "simple-wiki.mcpWikiBaseUrl" . | quote }}
+            - name: WIKI_PUBLIC_URL
+              value: {{ .Values.config.authUrl | quote }}
             {{- if .Values.mcp.allowedHosts }}
             - name: MCP_ALLOWED_HOSTS
               value: {{ .Values.mcp.allowedHosts | quote }}

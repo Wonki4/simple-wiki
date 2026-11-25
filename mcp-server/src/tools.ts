@@ -15,6 +15,11 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 3. 문서 원문이 필요하면 get_page(space, slug) — 응답의 version을 기억합니다.
 4. 새 문서는 create_page, 같은 제목이 있으면 409 → update_page로 전환합니다.
 
+HTML 미리보기:
+- get_page로 최신 문서와 version을 읽고, 내용에 맞는 HTML과 CSS를 직접 작성합니다. self-contained HTML에 표·그래프·접기 등을 구성하세요. 스크립트와 외부 리소스 요청은 차단됩니다.
+- save_page_html(space, slug, baseVersion, html)에 읽은 version을 전달하고, 응답의 previewUrl을 사용자에게 안내합니다. 문서마다 HTML 미리보기 한 편을 저장합니다. 다시 저장하면 이전 HTML을 교체하고 마크다운 원문과 이력은 보존합니다.
+- 409면 get_page로 최신 원문을 확인하고 HTML을 다시 작성하세요. 이전 HTML에 버전 번호만 바꾸어 저장하지 마세요.
+
 안전한 편집(중요):
 - 수정 전에 get_page로 현재 version을 확인하고, update_page/append_to_page/replace_in_page/revert_page 호출 시 expectedVersion으로 그 값을 넘깁니다.
 - 응답이 409(conflict)면 다른 사람이 그사이 수정한 것입니다. get_page로 다시 읽고 병합한 뒤 최신 version으로 재시도합니다. 절대 그냥 덮어쓰지 마세요.
@@ -135,7 +140,7 @@ function mimeFor(name: string): string {
  * 주어진 토큰·주소로 위키 API를 호출하는 MCP 서버를 만든다.
  * stdio(단일 사용자 env 토큰)와 HTTP(요청별 헤더 토큰) 양쪽에서 재사용한다.
  */
-export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
+export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = baseUrl): McpServer {
   const base = baseUrl.replace(/\/$/, "");
 
   async function api(path: string, init?: RequestInit): Promise<ApiResult> {
@@ -246,6 +251,44 @@ export function createWikiMcpServer(token: string, baseUrl: string): McpServer {
       return toResult(
         await api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}${qs}`),
       );
+    },
+  );
+
+  server.registerTool(
+    "save_page_html",
+    {
+      title: "문서 HTML 미리보기 저장",
+      description:
+        "문서의 현재 마크다운을 바탕으로 작성한 HTML/CSS를 저장하고 브라우저용 previewUrl을 반환합니다. editor 권한 필요. 같은 문서에 다시 저장하면 이전 미리보기를 교체합니다.",
+      inputSchema: {
+        space: z.string().min(1).describe("스페이스 키"),
+        slug: z.string().min(1).describe("get_page에 사용한 문서 slug"),
+        baseVersion: z.number().int().positive().describe("get_page로 읽은 최신 마크다운 version"),
+        html: z.string()
+          .refine((value) => value.trim().length > 0, "HTML이 비어 있습니다.")
+          .refine((value) => Buffer.byteLength(value, "utf8") <= 512 * 1024, "HTML은 UTF-8 기준 512 KiB 이하여야 합니다.")
+          .describe("에이전트가 직접 작성한 HTML과 인라인 CSS. 최대 512 KiB. 스크립트와 외부 리소스 요청은 차단됩니다."),
+      },
+    },
+    async ({ space, slug, baseVersion, html }) => {
+      const encodedSpace = encodeURIComponent(space);
+      const encodedSlug = encodeURIComponent(slug);
+      const previewPath = `/s/${encodedSpace}/${encodedSlug}/html`;
+      const browserBase = new URL(publicUrl);
+      if (!["http:", "https:"].includes(browserBase.protocol) || browserBase.username || browserBase.password || browserBase.search || browserBase.hash) {
+        throw new Error("미리보기용 위키 주소는 계정 정보, 쿼리, 프래그먼트 없는 HTTP(S) 주소여야 합니다.");
+      }
+      const result = await api(`/api/spaces/${encodedSpace}/pages/${encodedSlug}/html`, {
+        method: "PUT",
+        body: JSON.stringify({ html, baseVersion }),
+      });
+      if (!result.ok) return toResult(result);
+      const saved = result.data as { baseVersion?: unknown; previewUrl?: unknown } | null;
+      if (saved?.baseVersion !== baseVersion || saved.previewUrl !== previewPath) {
+        throw new Error("위키 응답에서 이 문서의 HTML 미리보기 저장 결과를 확인할 수 없습니다.");
+      }
+      const previewUrl = browserBase.href.replace(/\/$/, "") + previewPath;
+      return toResult({ ...result, data: { baseVersion, previewUrl } });
     },
   );
 

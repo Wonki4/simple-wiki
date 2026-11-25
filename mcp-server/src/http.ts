@@ -136,7 +136,7 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  const server = createWikiMcpServer(token, BASE);
+  const server = createWikiMcpServer(token, BASE, process.env.WIKI_PUBLIC_URL);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
