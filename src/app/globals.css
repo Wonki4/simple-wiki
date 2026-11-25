@@ -1298,7 +1298,7 @@ mark {
 .wiki-link-options small { display: block; font: .75rem/1.4 var(--font-mono); color: var(--muted); }
 .wiki-link-empty { color: var(--muted); }
 .document-body { min-width: 0; }
-.document-meta-row { display: flex; align-items: flex-end; gap: .5rem 1rem; margin-top: .75rem; }
+.document-meta-row { position: relative; display: flex; align-items: flex-end; gap: .5rem 1rem; margin-top: .75rem; }
 .document-meta-stack { flex: 1; min-width: 0; }
 .document-author { display: flex; align-items: center; gap: .45rem; margin: 0 0 .2rem; color: var(--muted); font-size: .81rem; line-height: 1.6; }
 .document-author__identity { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; color: var(--ink-2); font-weight: 550; overflow-wrap: anywhere; }
@@ -1310,14 +1310,15 @@ mark {
 .document-toolbar--revision { flex-wrap: wrap; }
 .document-toc { display: none; }
 .article-toc ul { margin: 0; list-style: none; }
-.article-toc a { display: block; color: var(--muted); font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.article-toc a { display: block; color: var(--muted); font-size: .875rem; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
 .article-toc a:hover { color: var(--link); }
 .article-toc--compact { flex: none; margin-left: auto; }
 .article-toc--compact summary { display: flex; align-items: center; gap: .3rem; width: auto; height: 2rem;
   padding: .25rem .35rem; border-radius: 5px; color: var(--muted); font-size: .875rem; font-weight: 550; }
 .article-toc--compact summary svg { width: .875rem; height: .875rem; }
 .article-toc--compact [open] summary svg { transform: rotate(180deg); }
-.article-toc--compact .disclosure__panel { width: min(19rem, calc(100vw - 2.5rem)); max-height: min(24rem, 60dvh);
+.article-toc--compact .disclosure { position: static; }
+.article-toc--compact .disclosure__panel { width: min(100%, 28rem); min-width: 0; max-height: min(24rem, 60dvh);
   overflow-y: auto; overscroll-behavior: contain; border-radius: 8px; }
 .article-toc__title { margin-bottom: .7rem; color: var(--ink-2); font-size: .875rem; font-weight: 650; }
 .article-toc--rail { position: sticky; top: calc(var(--masthead-h) + 2rem); max-height: calc(100dvh - var(--masthead-h) - 4rem);
@@ -1326,8 +1327,8 @@ mark {
 .article-toc--rail a { padding-block: .4rem; }
 /* Use the remaining reading space, including a user-resized sidebar. */
 @container reading (min-width: 62.5rem) {
-  .shell__inner:has(.document--with-toc) { max-width: 62.5rem; }
-  .document--with-toc { display: grid; grid-template-columns: minmax(0, 44rem) 12rem; column-gap: 3rem; max-width: 59rem; }
+  .shell__inner:has(.document--with-toc) { max-width: none; }
+  .document--with-toc { display: grid; grid-template-columns: minmax(0, 44rem) minmax(16rem, 1fr); column-gap: 2rem; max-width: 68rem; }
   .document-toc { display: block; padding-top: 5.5rem; }
   .article-toc--compact, .document-meta-row--toc { display: none; }
 }
