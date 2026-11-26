@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
 import { listReadableSpaces, requireSpaceRole } from "@/lib/access";
 import { listBrokenWikiLinks } from "@/lib/broken-wiki-links";
 import { effectiveSpaceRole, hasRole } from "@/lib/permissions";
@@ -20,6 +21,7 @@ export default async function BrokenLinksPage({ params }: { params: Promise<{ sp
         <h1 className="document-title">깨진 위키링크</h1>
         <p>이 스페이스의 문서에서 연결한 문서나 소제목을 찾을 수 없는 링크입니다. 열람 가능한 스페이스만 확인합니다.</p>
       </header>
+      <SpaceCollectionNav spaceKey={space.key} active="broken-links" canEdit={canEditSource} />
       {sources.length === 0 ? <p className="empty-collection">깨진 위키링크가 없습니다.</p> : <>
         <h2 className="collection-label">문서 {sources.length}개 · 깨진 링크 {total}개</h2>
         {sources.map(source => {

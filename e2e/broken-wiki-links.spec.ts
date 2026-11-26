@@ -28,6 +28,7 @@ test("원본 문서별 누락 문서·소제목을 검사하고 복구 사항과
       "`[[코드]]` [[release#준비]]",
     ].join("\n\n"));
     await page.goto(home);
+    await page.getByRole("button", { name: "문서 정리" }).click();
     await page.getByRole("link", { name: "깨진 위키링크" }).click();
     const group = page.getByRole("region", { name: source });
     await expect(group.getByRole("listitem")).toHaveCount(5);

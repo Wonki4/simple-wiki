@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
 import { requireSpaceRole } from "@/lib/access";
 import { listPageTrash } from "@/lib/page-trash";
 import { restoreFromTrash } from "@/actions/pages";
@@ -15,6 +16,7 @@ export default async function TrashPage({ params, searchParams }: {
     <main className="collection">
       <Link href={`/s/${spaceKey}`} className="crumb">← {space.name}</Link>
       <header className="collection-heading"><h1 className="document-title">문서 휴지통</h1></header>
+      <SpaceCollectionNav spaceKey={space.key} active="trash" canEdit />
       {error === "missing" && <p className="notice notice-warn" role="alert">이미 복원했거나 휴지통에 없는 문서입니다.</p>}
       {pages.length === 0 && <p className="muted">휴지통이 비어 있습니다.</p>}
       <ul className="trash-list">

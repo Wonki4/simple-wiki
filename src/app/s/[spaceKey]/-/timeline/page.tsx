@@ -65,6 +65,7 @@ export default async function SpaceTimeline({ params, searchParams }: {
 }) {
   const { spaceKey } = await params;
   const { space, role } = await requireSpaceRole(spaceKey, "viewer");
+  const canEdit = hasRole(role, "editor");
   const query: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(await searchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
   );
@@ -84,7 +85,7 @@ export default async function SpaceTimeline({ params, searchParams }: {
     <main className={`collection ${styles.timeline}`}>
       <Link className="document-path" href={home}><WikiIcon name="book" /><span>{space.name}</span></Link>
       <header className="collection-heading"><h1 className="document-title">스페이스 타임라인</h1></header>
-      <SpaceCollectionNav spaceKey={space.key} active="timeline" />
+      <SpaceCollectionNav spaceKey={space.key} active="timeline" canEdit={canEdit} />
       <nav aria-label="조회 기간" className={styles.periods}>
         {TIMELINE_PERIODS.map(period => <Link key={period} prefetch={false}
           aria-current={(selected?.period ?? query.period) === period ? "page" : undefined}
@@ -103,7 +104,7 @@ export default async function SpaceTimeline({ params, searchParams }: {
         <div className={styles.rangeBar}>
           <p className={styles.range}><time dateTime={range.from}>{range.from}</time><span> – </span><time dateTime={range.to}>{range.to}</time></p>
           <TimelineCopyRequest key={`${range.from}/${range.to}`} from={range.from} to={range.to}
-            spaceKey={space.key} canEdit={hasRole(role, "editor")} />
+            spaceKey={space.key} canEdit={canEdit} />
         </div>
         {months.length === 0 && <p className="empty-collection">이 기간에 표시할 기록이 없습니다.</p>}
         {months.map(group => {
