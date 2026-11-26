@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
 import { WikiIcon } from "@/components/WikiIcon";
+import { AttachmentThumbnail } from "@/components/AttachmentThumbnail";
 import { requireSpaceRole } from "@/lib/access";
+import { isPreviewableImage } from "@/lib/attachment-image";
 import { listAttachmentUsage } from "@/lib/attachment-usage";
 import { hasRole } from "@/lib/permissions";
 
@@ -35,8 +37,13 @@ export default async function AttachmentsPage({ params, searchParams }: {
         <ul className="attachment-list">
           {files.map(file => (
             <li key={file.id}>
+              {isPreviewableImage(file.mime) ? (
+                <AttachmentThumbnail id={file.id} filename={file.filename} />
+              ) : (
+                <span className="attachment-visual" aria-hidden="true"><WikiIcon name="file" /></span>
+              )}
               <div>
-                <h3><WikiIcon name="attach" />{file.filename}</h3>
+                <h3>{file.filename}</h3>
                 <p className="meta"><time dateTime={file.createdAt.toISOString()}>{file.createdAt.toISOString().slice(0, 10)}</time> · {file.size.toLocaleString("ko-KR")} 바이트</p>
               </div>
               <div>

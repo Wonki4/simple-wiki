@@ -27,7 +27,7 @@ export async function listAttachmentUsage(space: { id: string; key: string }, fi
   const files = await prisma.attachment.findMany({
     where: { spaceId: space.id, filename: { contains: filename.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" } },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-    select: { id: true, filename: true, createdAt: true, size: true },
+    select: { id: true, filename: true, mime: true, createdAt: true, size: true },
   });
   const results = files.map(file => ({ ...file, pages: [] as { slug: string; title: string }[] }));
   if (!results.length) return results;
