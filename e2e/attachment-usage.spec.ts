@@ -1,9 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
-async function upload(page: Page, space: string, name: string) {
+const png = {
+  mimeType: "image/png",
+  // A 512 × 16 PNG lets the test distinguish a resized image from a CSS-scaled original.
+  buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAgAAAAAQCAMAAABX7zd6AAAAA1BMVEU4jcyR/eFvAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVR4nO3BAQ0AAADCoPdPbQ8HFAAAAAAAAADQmQEgEAABX4WEmAAAAABJRU5ErkJggg==", "base64"),
+};
+
+async function upload(page: Page, space: string, name: string, file = { mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7") }) {
   const res = await page.request.post(`/api/spaces/${space}/attachments`, {
-    multipart: { file: { name, mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7") } },
+    multipart: { file: { name, ...file } },
   });
   expect(res.ok()).toBe(true);
   return (await res.json()).url as string;
@@ -18,8 +24,8 @@ async function create(page: Page, space: string, title: string, content: string)
 test("열람자가 파일을 찾아 사용 문서로 이동하고 본문 수정·삭제·복원 결과를 확인한다", async ({ page, browser }) => {
   await login(page, "wiki-admin", "admin1234");
   const prefix = `usage-${Date.now()}`;
-  const name = `${prefix}-notes.pdf`;
-  const url = await upload(page, "notice", name);
+  const name = `${prefix}-diagram.png`;
+  const url = await upload(page, "notice", name, png);
   const unusedName = `${prefix}-unused.pdf`;
   await upload(page, "notice", unusedName);
   const first = await create(page, "notice", `${prefix}-a`, `![이미지](${url})\n\n[자료](${url})`);
@@ -34,11 +40,26 @@ test("열람자가 파일을 찾아 사용 문서로 이동하고 본문 수정�
   await view.getByRole("link", { name: "첨부파일", exact: true }).click();
   const row = view.locator(".attachment-list > li").filter({ has: view.getByRole("heading", { name, exact: true }) });
   await expect(row).toContainText("사용 문서 2개");
-  await expect(row.getByRole("link")).toHaveCount(2);
-  await expect(view.locator(".attachment-list > li").filter({ hasText: unusedName })).toContainText("사용 중인 문서 없음");
+  const usages = row.getByRole("list").getByRole("link");
+  await expect(usages).toHaveCount(2);
+  const unused = view.locator(".attachment-list > li").filter({ hasText: unusedName });
+  await expect(unused).toContainText("사용 중인 문서 없음");
+  await expect(unused.locator("img")).toHaveCount(0);
   await view.getByRole("searchbox", { name: "파일 이름" }).fill(name.toUpperCase());
   await view.getByRole("search", { name: "첨부파일 검색" }).getByRole("button", { name: "검색" }).click();
   await expect(view.locator(".attachment-list > li")).toHaveCount(1);
+  const preview = row.locator("img");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("alt", "");
+  await expect(preview).toHaveAttribute("src", url + "?preview=thumbnail");
+  await expect(row.locator("a:has(img)")).toHaveAttribute("href", url);
+  await preview.scrollIntoViewIfNeeded();
+  const width = await preview.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+    return image.naturalWidth;
+  });
+  expect(width).toBeGreaterThan(0);
+  expect(width).toBeLessThan(512);
   expect(await view.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await row.getByRole("link", { name: first }).click();
   await expect(view).toHaveURL(`/s/notice/${first}`);
@@ -46,7 +67,7 @@ test("열람자가 파일을 찾아 사용 문서로 이동하고 본문 수정�
   const replacement = `코드 예시만 남음\n\n\`\`\`md\n[예시](${url})\n\`\`\``;
   expect((await page.request.put(`${api}/pages/${first}`, { data: { title: first, content: replacement } })).ok()).toBe(true);
   await view.goto(listing);
-  await expect(row.getByRole("link")).toHaveCount(1);
+  await expect(usages).toHaveCount(1);
   const deleted = await page.request.delete(`${api}/pages/${second}`);
   expect(deleted.ok()).toBe(true);
   await view.reload();
@@ -61,9 +82,11 @@ test("열람자가 파일을 찾아 사용 문서로 이동하고 본문 수정�
 test("다른 스페이스의 파일과 사용처를 공개 목록에 노출하지 않는다", async ({ page, browser }) => {
   await login(page, "wiki-admin", "admin1234");
   const prefix = `private-${Date.now()}`;
-  const publicUrl = await upload(page, "notice", `${prefix}-public.pdf`);
-  const privateName = `${prefix}-secret.pdf`;
-  const privateUrl = await upload(page, "eng", privateName);
+  const publicUrl = await upload(page, "notice", `${prefix}-public.svg`, {
+    mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'),
+  });
+  const privateName = `${prefix}-secret.png`;
+  const privateUrl = await upload(page, "eng", privateName, png);
   const privateTitle = `${prefix}-private-page`;
   await create(page, "eng", privateTitle, `[공개 파일](${publicUrl})\n\n[제한 파일](${privateUrl})`);
   await create(page, "notice", `${prefix}-public-page`, `[다른 스페이스](${privateUrl})`);
@@ -72,6 +95,7 @@ test("다른 스페이스의 파일과 사용처를 공개 목록에 노출하�
   await login(view, "bob", "bob1234");
   await view.goto(`/s/notice/-/attachments?q=${prefix}`);
   await expect(view.locator(".attachment-list > li")).toHaveCount(1);
+  await expect(view.locator(".attachment-list img")).toHaveCount(0);
   await expect(view.getByRole("main")).toContainText("사용 중인 문서 없음");
   await expect(view.getByRole("main")).not.toContainText(privateName);
   await expect(view.getByRole("main")).not.toContainText(privateTitle);
@@ -82,5 +106,6 @@ test("다른 스페이스의 파일과 사용처를 공개 목록에 노출하�
   await expect(view.getByRole("heading", { name: "첨부파일", exact: true })).toHaveCount(0);
   await expect(view.getByText(privateName)).toHaveCount(0);
   expect((await view.request.get(privateUrl)).status()).toBe(404);
+  expect((await view.request.get(privateUrl + "?preview=thumbnail")).status()).toBe(404);
   await reader.close();
 });
