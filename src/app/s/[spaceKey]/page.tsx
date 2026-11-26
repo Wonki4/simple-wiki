@@ -4,10 +4,12 @@ import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/permissions";
 import { WikiIcon } from "@/components/WikiIcon";
 import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
+import { spaceVisibilityInfo } from "@/lib/space-visibility";
 
 export default async function SpaceHome({ params }: { params: Promise<{ spaceKey: string }> }) {
   const { spaceKey } = await params;
   const { space, role } = await requireSpaceRole(spaceKey, "viewer");
+  const visibility = spaceVisibilityInfo[space.visibility];
   const pages = await prisma.page.findMany({
     where: { spaceId: space.id, deletedAt: null },
     orderBy: [{ updatedAt: "desc" }, { title: "asc" }],
@@ -15,7 +17,9 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
   });
   return (
     <main className="collection">
-      <div className="document-path"><WikiIcon name="book" />스페이스</div>
+      <div className="document-path" title={visibility.description}>
+        <WikiIcon name={visibility.icon} /><span>{visibility.label}</span>
+      </div>
       <header className="collection-heading">
         <h1 className="document-title">{space.name}</h1>
         {space.description && <p>{space.description}</p>}

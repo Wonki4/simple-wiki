@@ -23,6 +23,7 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
   const db = new PrismaClient();
   const marker = Date.now();
   const key = `admin-${marker}`;
+  const spaceLink = `a[href="/s/${key}"]`;
   const name = "운영팀 배포와 장애 대응 절차를 함께 관리하는 스페이스";
   const groupName = `운영팀 배포 담당자 ${marker}`;
   const reader = await browser.newContext();
@@ -37,13 +38,25 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
     await checkLayout(page, true);
     await page.getByLabel("키 (URL용, 소문자/숫자/하이픈)").fill(key);
     await page.getByLabel("이름", { exact: true }).fill(name);
-    await page.getByLabel("공개 범위").selectOption("restricted");
+    const publicOption = page.getByRole("radio", { name: "전체 공개", exact: true });
+    const privateOption = page.getByRole("radio", { name: "비공개", exact: true });
+    await expect(publicOption).toBeChecked();
+    await privateOption.check();
     await page.getByRole("button", { name: "만들기", exact: true }).click();
     await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("비공개", { exact: true })).toBeVisible();
+    await bob.goto("/s/notice");
+    const readerSidebar = bob.getByRole("complementary", { name: "위키 탐색" });
+    await expect(readerSidebar).toBeVisible();
+    await expect(readerSidebar.locator(spaceLink)).toHaveCount(0);
 
     await page.getByRole("button", { name: "위키 탐색 열기" }).click();
-    await page.getByRole("complementary", { name: "위키 탐색" }).getByRole("link", { name: "스페이스 설정", exact: true }).click();
-    await expect(page.getByRole("complementary", { name: "위키 탐색" })).toBeHidden();
+    const sidebar = page.getByRole("complementary", { name: "위키 탐색" });
+    const privateSpaces = sidebar.getByRole("group", { name: "비공개", exact: true });
+    const publicSpaces = sidebar.getByRole("group", { name: "전체 공개", exact: true });
+    await expect(privateSpaces.locator(spaceLink)).toBeVisible();
+    await sidebar.getByRole("link", { name: "스페이스 설정", exact: true }).click();
+    await expect(sidebar).toBeHidden();
     await expect(page.getByRole("heading", { name: `${name} 설정`, exact: true })).toBeVisible();
     await checkLayout(page);
     await expect(page.locator("main").getByRole("link", { name: /^(그룹 관리|새 스페이스|개인 액세스 토큰)$/ })).toHaveCount(0);
@@ -95,19 +108,24 @@ test("관리 화면에서 스페이스와 그룹을 만들고 모바일에서 �
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: "output/playwright/admin-settings-after-desktop.png", fullPage: true });
 
-    const visibility = page.getByRole("combobox", { name: "공개 범위" });
-    await visibility.selectOption("organization");
+    await expect(privateOption).toBeChecked();
+    await publicOption.check();
+    await expect(privateSpaces.locator(spaceLink)).toBeVisible();
     const saved = page.waitForResponse(response => response.request().method() === "POST"
       && new URL(response.url()).pathname === `/s/${key}/settings`);
     await page.getByRole("button", { name: "저장", exact: true }).click();
     expect((await saved).ok()).toBe(true);
+    await expect(publicSpaces.locator(spaceLink)).toBeVisible();
+    await expect(privateSpaces.locator(spaceLink)).toHaveCount(0);
     await page.reload();
-    await expect(visibility).toHaveValue("organization");
+    await expect(publicOption).toBeChecked();
     page.once("dialog", dialog => dialog.accept());
     await userRow.getByRole("button", { name: "삭제", exact: true }).click();
     await expect(userRow).toHaveCount(0);
     await page.reload();
     await expect(userRow).toHaveCount(0);
+    await publicSpaces.locator(spaceLink).click();
+    await expect(page.getByRole("main").getByText("전체 공개", { exact: true })).toBeVisible();
   } finally {
     await reader.close();
     await db.space.deleteMany({ where: { key } });

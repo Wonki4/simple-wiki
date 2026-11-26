@@ -1,4 +1,5 @@
 import { SettingsPage } from "@/components/SettingsPage";
+import { SpaceVisibilityField } from "@/components/SpaceVisibilityField";
 import { requireSpaceRole } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { deleteSpace, removeSpacePermission, updateSpaceVisibility } from "@/actions/spaces";
@@ -41,15 +42,9 @@ export default async function SpaceSettingsPage({
 
       <section className="settings-section" aria-labelledby="visibility-heading">
         <h2 id="visibility-heading" className="section-title">공개 범위</h2>
-        <p id="visibility-help" className="settings-help">
-          전체 공개는 로그인한 모든 사용자가 읽을 수 있습니다. 제한된 스페이스는 권한을 부여한 사용자·그룹과 전역 관리자가 접근할 수 있습니다.
-        </p>
-        <form action={updateSpaceVisibility.bind(null, spaceKey)} className="settings-form settings-visibility-form">
-          <select name="visibility" aria-label="공개 범위" aria-describedby="visibility-help" defaultValue={space.visibility} className="select">
-            <option value="organization">전체 공개</option>
-            <option value="restricted">제한</option>
-          </select>
-          <button className="btn btn-primary">저장</button>
+        <form action={updateSpaceVisibility.bind(null, spaceKey)} className="settings-visibility-form">
+          <SpaceVisibilityField key={space.visibility} defaultValue={space.visibility} labelledBy="visibility-heading" />
+          <button className="btn btn-primary mt-3 max-[600px]:w-full">저장</button>
         </form>
       </section>
 
