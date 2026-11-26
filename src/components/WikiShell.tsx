@@ -1,6 +1,7 @@
 import { Sidebar } from "./Sidebar";
 import { SpacePagesProvider } from "./SpacePagesContext";
 import { getSpaceTree } from "@/lib/space-tree";
+import { getFavoriteSpaceIds } from "@/lib/space-favorites";
 import type { SpaceWithPermissions } from "@/lib/access";
 import { hasRole, resolveSpaceRole, type SessionInfo } from "@/lib/permissions";
 
@@ -12,13 +13,18 @@ interface Props {
 }
 
 export async function WikiShell({ children, spaces, current, session }: Props) {
-  const pages = current ? await getSpaceTree(current.id) : [];
+  const [pages, favorites] = await Promise.all([
+    current ? getSpaceTree(current.id) : [],
+    getFavoriteSpaceIds(session.userId),
+  ]);
   const role = current ? resolveSpaceRole(session, current.visibility, current.permissions) : null;
 
   return (
     <div className="shell">
       <Sidebar
-        spaces={spaces}
+        spaces={spaces.map(({ id, key, name, visibility }) => ({
+          key, name, visibility, favorite: favorites.has(id),
+        }))}
         currentKey={current?.key ?? ""}
         currentName={current?.name ?? ""}
         pages={pages}

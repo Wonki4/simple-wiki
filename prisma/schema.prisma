@@ -27,6 +27,7 @@ model User {
   createdAt DateTime @default(now())
   apiTokens ApiToken[]
   likes     Like[]
+  spaceFavorites SpaceFavorite[]
   comments  Comment[]
   groupMemberships WikiGroupMember[]
 
@@ -130,6 +131,17 @@ model Space {
   permissions SpacePermission[]
   attachments Attachment[]
   apiTokens   ApiToken[]
+  favorites   SpaceFavorite[]
+}
+
+model SpaceFavorite {
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId String
+  space   Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, spaceId])
+  @@index([spaceId])
 }
 
 model SpacePermission {
