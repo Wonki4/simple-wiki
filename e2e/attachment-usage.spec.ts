@@ -31,7 +31,9 @@ test("열람자가 파일을 찾아 사용 문서로 이동하고 본문 수정�
   const view = await reader.newPage();
   await login(view, "bob", "bob1234");
   await view.goto("/s/notice");
-  await view.getByRole("link", { name: "첨부파일", exact: true }).click();
+  const filesTab = view.getByRole("navigation", { name: "스페이스 보기" }).getByRole("link", { name: "첨부파일", exact: true });
+  await filesTab.click();
+  await expect(filesTab).toHaveAttribute("aria-current", "page");
   const row = view.locator(".attachment-list > li").filter({ has: view.getByRole("heading", { name, exact: true }) });
   await expect(row).toContainText("사용 문서 2개");
   await expect(row.getByRole("link")).toHaveCount(2);

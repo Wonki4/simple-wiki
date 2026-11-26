@@ -1,14 +1,16 @@
 import Link from "next/link";
+import { SpaceCollectionNav } from "@/components/SpaceCollectionNav";
 import { WikiIcon } from "@/components/WikiIcon";
 import { requireSpaceRole } from "@/lib/access";
 import { listAttachmentUsage } from "@/lib/attachment-usage";
+import { hasRole } from "@/lib/permissions";
 
 export default async function AttachmentsPage({ params, searchParams }: {
   params: Promise<{ spaceKey: string }>;
   searchParams: Promise<{ q?: string }>;
 }) {
   const { spaceKey } = await params;
-  const { space } = await requireSpaceRole(spaceKey, "viewer");
+  const { space, role } = await requireSpaceRole(spaceKey, "viewer");
   const { q } = await searchParams;
   const filename = typeof q === "string" ? q.trim() : "";
   const files = await listAttachmentUsage(space, filename);
@@ -20,6 +22,7 @@ export default async function AttachmentsPage({ params, searchParams }: {
         <h1 className="document-title">첨부파일</h1>
         <p>이 스페이스에 올린 파일과 현재 본문에서 파일을 사용하는 문서입니다.</p>
       </header>
+      <SpaceCollectionNav spaceKey={space.key} active="attachments" canEdit={hasRole(role, "editor")} />
       <form action={`${home}/-/attachments`} className="attachment-search" role="search" aria-label="첨부파일 검색">
         <input name="q" type="search" className="input" aria-label="파일 이름" placeholder="파일 이름 검색" defaultValue={filename} />
         <button className="btn btn-ghost btn-sm">검색</button>

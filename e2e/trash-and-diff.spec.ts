@@ -46,6 +46,7 @@ test("삭제한 문서를 검색·API에서 숨기고 이력·댓글·좋아요�
   await page.goto(`/s/notice/${ref}`);
   await expect(page.locator("article a.wiki-link-missing")).toHaveText(slug);
   await page.goto("/s/notice");
+  await page.getByRole("button", { name: "문서 정리" }).click();
   await page.getByRole("link", { name: "휴지통" }).click();
   const row = page.locator(".trash-list li").filter({ hasText: slug });
   await expect(row).toContainText(root);

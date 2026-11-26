@@ -20,16 +20,8 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
         <h1 className="document-title">{space.name}</h1>
         {space.description && <p>{space.description}</p>}
       </header>
-      <SpaceCollectionNav spaceKey={space.key} active="documents" />
-      <div className="collection-label flex flex-wrap items-center justify-between gap-3">
-        <h2>최근 수정한 문서</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/attachments`}><WikiIcon name="attach" />첨부파일</Link>
-          <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/broken-links`}>깨진 위키링크</Link>
-          {hasRole(role, "editor") && <Link className="btn btn-ghost btn-sm" href={`/s/${spaceKey}/-/trash`}>휴지통</Link>}
-          <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/orphan-pages`}>고아 문서</Link>
-        </div>
-      </div>
+      <SpaceCollectionNav spaceKey={space.key} active="documents" canEdit={hasRole(role, "editor")} />
+      <h2 className="collection-label">최근 수정한 문서</h2>
       {pages.length > 0 ? (
         <ul className="recent-list">
           {pages.map((p) => (
@@ -44,7 +36,6 @@ export default async function SpaceHome({ params }: { params: Promise<{ spaceKey
       ) : (
         <div className="empty-collection">
           <p>아직 문서가 없습니다.</p>
-          <Link className="btn btn-ghost btn-sm" prefetch={false} href={`/s/${spaceKey}/-/broken-links`}>깨진 위키링크</Link>
           {hasRole(role, "editor") && <Link href={`/s/${spaceKey}/new`} className="btn btn-primary">첫 문서 작성</Link>}
         </div>
       )}
