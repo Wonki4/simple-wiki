@@ -39,6 +39,7 @@ export async function POST(
     return Response.json({
       slug,
       version: result.version,
+      pageId: result.pageId,
       url: `/s/${spaceKey}/${encodeURIComponent(slug)}`,
     });
   } catch (e) {

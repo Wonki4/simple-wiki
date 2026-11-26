@@ -130,6 +130,7 @@ model Space {
   permissions SpacePermission[]
   attachments Attachment[]
   apiTokens   ApiToken[]
+  wikiTopics  WikiTopic[]
 }
 
 model SpacePermission {
@@ -207,6 +208,8 @@ model PageRevision {
   viaLabel  String?  // api일 때 토큰 이름
   createdAt DateTime @default(now())
   timelineReview TimelineReview?
+  wikiItems      WikiTopicItem[]
+  wikiUpdates    WikiTopicUpdate[]
 
   @@unique([pageId, version])
   @@index([pageId, createdAt, id])
@@ -217,6 +220,55 @@ model TimelineReview {
   revisionId String          @id
   revision   PageRevision    @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   entries    TimelineEntry[]
+}
+
+enum WikiItemKind {
+  current
+  example
+  discussion
+}
+
+model WikiTopic {
+  id        String           @id @default(cuid())
+  spaceId   String
+  space     Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  key       String
+  title     String
+  version   Int              @default(0)
+  updatedAt DateTime         @updatedAt
+  items     WikiTopicItem[]
+  updates   WikiTopicUpdate[]
+
+  @@unique([spaceId, key])
+  @@index([spaceId, updatedAt, key])
+}
+
+model WikiTopicItem {
+  topicId    String
+  topic      WikiTopic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  key        String
+  kind       WikiItemKind
+  text       String
+  evidence   String
+  revisionId String
+  revision   PageRevision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@id([topicId, key])
+  @@index([revisionId])
+}
+
+// Records which source and patch produced each topic version, for safe request retries.
+model WikiTopicUpdate {
+  topicId    String
+  topic      WikiTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  version    Int
+  revisionId String
+  revision   PageRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  digest     String
+
+  @@id([topicId, version])
+  @@unique([topicId, revisionId, digest])
+  @@index([revisionId])
 }
 
 model TimelineEntry {

@@ -123,7 +123,7 @@ export interface WritePageInput {
  */
 export async function createPageInSpace(
   input: WritePageInput,
-): Promise<{ slug: string; created: boolean }> {
+): Promise<{ slug: string; created: boolean; pageId: string | null }> {
   const title = input.title.trim();
   if (!title) throw new Error("제목을 입력하세요.");
   const slug = slugify(title);
@@ -132,7 +132,7 @@ export async function createPageInSpace(
   const source = input.source ?? "web";
   const viaLabel = input.viaLabel ?? null;
 
-  const created = await prisma.$transaction(async (tx) => {
+  const pageId = await prisma.$transaction(async (tx) => {
     const [page] = await tx.page.createManyAndReturn({
       skipDuplicates: true,
       select: { id: true },
@@ -148,20 +148,22 @@ export async function createPageInSpace(
         parentId: input.parentId ?? null,
       },
     });
-    if (!page) return false;
+    if (!page) return null;
     await tx.pageRevision.create({
       data: { pageId: page.id, version: 1, title, content: input.content, authorId: input.authorId, source, viaLabel },
     });
     await syncLinks(tx, page.id, input.spaceId, input.content);
-    return true;
+    return page.id;
   });
 
-  if (created) {
+  if (pageId) {
     invalidateWikiNames(input.spaceId);
     invalidateBacklinks();
   }
-  return { slug, created };
+  return { slug, pageId, created: pageId !== null };
 }
+
+type PageEditResult = { found: false } | { found: true; pageId: string; version: number };
 
 /**
  * 기존 페이지 수정. 제목이 바뀌어도 slug는 유지한다(링크 안정성).
@@ -170,7 +172,7 @@ export async function createPageInSpace(
  */
 export async function updatePageInSpace(
   input: WritePageInput & { slug: string; expectedVersion?: number },
-): Promise<{ found: boolean; version?: number }> {
+): Promise<PageEditResult> {
   const title = input.title.trim();
   if (!title) throw new Error("제목을 입력하세요.");
 
@@ -190,7 +192,7 @@ export async function updatePageInSpace(
     viaLabel: input.viaLabel ?? null,
   });
 
-  return { found: true, version };
+  return { found: true, pageId: page.id, version };
 }
 
 export type EditActionInput = {
@@ -210,7 +212,7 @@ export type EditActionInput = {
 export async function editPageContent(
   input: EditActionInput,
   transform: (current: string) => string,
-): Promise<{ found: boolean; version?: number }> {
+): Promise<PageEditResult> {
   const page = await prisma.page.findUnique({
     where: { deletedAt: null, spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
@@ -227,20 +229,20 @@ export async function editPageContent(
     source: input.source ?? "web",
     viaLabel: input.viaLabel ?? null,
   });
-  return { found: true, version };
+  return { found: true, pageId: page.id, version };
 }
 
 // 본문 끝에 content를 덧붙인다.
 export function appendToPage(
   input: EditActionInput & { content: string },
-): Promise<{ found: boolean; version?: number }> {
+): Promise<PageEditResult> {
   return editPageContent(input, (current) => appendContent(current, input.content));
 }
 
 // oldString을 정확히 1곳에서 newString으로 치환한다(0곳/2곳↑는 ReplaceError).
 export function replaceInPage(
   input: EditActionInput & { oldString: string; newString: string },
-): Promise<{ found: boolean; version?: number }> {
+): Promise<PageEditResult> {
   return editPageContent(input, (current) => applyReplace(current, input.oldString, input.newString));
 }
 
@@ -257,7 +259,7 @@ export async function revertPage(input: {
   source?: EditSource;
   viaLabel?: string | null;
   expectedVersion?: number;
-}): Promise<{ found: boolean; missingRevision?: boolean; version?: number }> {
+}): Promise<(PageEditResult & { missingRevision?: false }) | { found: true; missingRevision: true }> {
   const page = await prisma.page.findUnique({
     where: { deletedAt: null, spaceId_slug: { spaceId: input.spaceId, slug: input.slug } },
   });
@@ -278,7 +280,7 @@ export async function revertPage(input: {
     source: input.source ?? "web",
     viaLabel: input.viaLabel ?? null,
   });
-  return { found: true, version };
+  return { found: true, pageId: page.id, version };
 }
 
 export type MovePageResult =

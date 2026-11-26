@@ -75,6 +75,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ spaceKey: 
   return Response.json(
     {
       space: { key: auth.space.key },
+      pageId: result.pageId,
       slug: result.slug,
       title: title.trim(),
       version: 1,

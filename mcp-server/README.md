@@ -19,15 +19,47 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 | `create_page` | 새 페이지 생성 | editor |
 | `update_page` | 페이지 수정(새 리비전) | editor |
 | `save_page_html` | 에이전트가 작성한 HTML을 문서에 저장하고 HTML Viewer 링크를 반환 | editor |
+| `list_wiki_topics` | 스페이스에서 관련 주제를 찾고 제목, 고정 키, 버전 조회 | viewer |
+| `get_wiki_topic` | 주제의 항목과 각 항목의 근거 문장, 원문 버전 조회 | viewer |
+| `save_page_wiki_topics` | 저장한 문서 버전을 근거로 관련 주제의 항목 갱신 | editor |
 | `save_page_timeline` | 원문 버전의 회의·논의와 결정을 근거 문장과 함께 저장 | editor |
-| `list_timeline_sources` | 기간 내에 저장한 버전 중 타임라인을 아직 정리하지 않은 버전 조회 | viewer |
+| `list_timeline_sources` | 기간 내에 저장한 버전 중 변경 이력의 논의·결정을 아직 정리하지 않은 버전 조회 | viewer |
 | `delete_page` | 문서를 휴지통으로 이동 | editor |
 | `list_trashed_pages` | 스페이스 휴지통 목록 | editor |
 | `restore_trashed_page` | 휴지통 문서를 ID로 복원 | editor |
 
 권한은 발급자의 현재 권한과 토큰의 발급 범위를 함께 적용합니다. 범위 밖 스페이스는 목록과 검색에서 제외되며 직접 조회하면 404가 반환됩니다.
 
-### 회의록을 스페이스 타임라인에 기록하기
+### 문서와 LLM Wiki 주제를 함께 저장하기
+
+예를 들어 `배포와 롤백` 주제의 오류율 기준이 바뀌면, 회의록을 쓰는 에이전트가 기존 주제에서 그 기준을 찾아 갱신합니다.
+
+1. 기존 문서를 수정할 때는 `list_wiki_topics`의 `sourceSlug`로 이 문서를 인용 중인 주제를 확인합니다. 새로 관련된 주제는 `query`로 찾아보고, `get_wiki_topic(space, key)`에서 현재 버전과 항목 키를 읽습니다.
+2. `create_page`, `update_page`, `append_to_page`, `replace_in_page`, `revert_page`에 `wikiTopics`를 함께 전달합니다. 아래 예시에서는 기존 주제의 버전이 3이고, 회의록에 변경 결정이 명시되어 있습니다.
+3. 저장 응답의 `llmWiki.status`를 확인합니다. `complete`면 주제 처리가 끝났습니다. `get_wiki_topic`으로 근거를 조회하고 `get_page(space, slug, version)`으로 그 당시의 원문을 읽을 수 있습니다.
+
+```json
+{
+  "space": "eng",
+  "title": "6월 운영 회의록",
+  "content": "배포 후 오류율이 1%를 넘으면 롤백하기로 확정했다.",
+  "wikiTopics": [{
+    "key": "배포-롤백", "title": "배포와 롤백", "expectedVersion": 3,
+    "changes": [{
+      "key": "오류율-기준", "kind": "current", "text": "배포 후 오류율이 1%를 넘으면 롤백한다.",
+      "evidence": "배포 후 오류율이 1%를 넘으면 롤백하기로 확정했다."
+    }]
+  }]
+}
+```
+
+`expectedVersion`은 **주제** 버전입니다. 처음 만드는 주제에는 0을 씁니다. 적용 사례는 `example`, 제안은 `discussion`, 확정된 기준은 `current`로 기록합니다. 항목을 고칠 때는 기존 키를 재사용하고 `changes`에 수정할 항목만 담습니다. 지식 변화가 없는 원문은 `wikiTopics: []`로 저장합니다.
+
+`wikiTopics`를 생략했거나 주제 갱신이 실패하면 마크다운 저장은 완료된 채 `llmWiki.status`가 `pending`으로 돌아옵니다. 응답의 `source`에 있는 `space`, `slug`, `pageId`, **원문** `version`을 복사하고 `topics`를 더해 `save_page_wiki_topics`를 호출합니다. 409 응답이면 최신 원문과 주제를 읽어 적용할 변경을 다시 판단하세요. `pageId`가 바뀌면 같은 주소에 새 문서가 생겼으므로 근거도 새로 확인합니다. 같은 원문 버전에 동일한 요청을 다시 보내도 중복되지 않습니다.
+
+모든 근거 문서가 휴지통에 있으면 그 주제는 목록과 조회에서 숨겨집니다. 새 원문으로 같은 키를 다시 사용할 때 생성이 409이고 상세 조회가 404라면, 충돌 응답의 `currentVersion`을 `expectedVersion`에 넣어 새 근거의 항목을 저장할 수 있습니다.
+
+### 회의록을 스페이스 변경 이력에 기록하기
 
 문서를 작성하거나 수정한 에이전트는 같은 작업에서 `save_page_timeline`에 저장 응답의 `version`을 전달합니다. 제안은 `discussion`, 원문에 채택 또는 번복이 명시된 사항은 `decision`으로 보냅니다.
 
@@ -45,7 +77,7 @@ MCP 클라이언트에서 위키 문서를 읽고 쓸 수 있습니다.
 
 `evidence`는 지정한 버전의 마크다운 본문에서 그대로 가져옵니다. 회의 날짜가 제목이나 본문에 있을 때만 `date`를 지정하고, 생략하면 버전의 저장일이 적용됩니다. 같은 버전을 다시 처리할 때는 그 버전에 남길 항목 전체를 보내세요. 오탈자 수정 등 기록할 사항이 없으면 `entries: []`로 처리를 마칩니다.
 
-과거 회의록은 타임라인에서 **기간 정리 요청 복사**로 시작할 수 있습니다. `list_timeline_sources(space, from, to)`로 한국 날짜 기준 양 끝 날짜를 포함한 목록을 받고, 각 항목을 `get_page(space, slug, version)`로 읽어 저장합니다. `nextCursor`가 있으면 같은 기간과 커서로 이어서 조회합니다.
+과거 회의록은 스페이스의 **변경 이력**에서 **기간 정리 요청 복사**로 시작할 수 있습니다. `list_timeline_sources(space, from, to)`로 한국 날짜 기준 양 끝 날짜를 포함한 목록을 받고, 각 항목을 `get_page(space, slug, version)`로 읽어 저장합니다. `nextCursor`가 있으면 같은 기간과 커서로 이어서 조회합니다.
 
 ### HTML Viewer에 문서 표시하기
 

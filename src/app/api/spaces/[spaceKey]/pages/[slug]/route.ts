@@ -35,6 +35,7 @@ export async function GET(
     if (!rev) return Response.json({ error: "해당 버전이 없습니다." }, { status: 404 });
     return Response.json({
       space: { key: auth.space.key, name: auth.space.name },
+      pageId: page.id,
       slug: page.slug,
       title: rev.title,
       content: rev.content,
@@ -47,6 +48,7 @@ export async function GET(
 
   return Response.json({
     space: { key: auth.space.key, name: auth.space.name },
+    pageId: page.id,
     slug: page.slug,
     title: page.title,
     content: page.content,
@@ -77,7 +79,7 @@ export async function PUT(
   const expectedVersion =
     typeof body.expectedVersion === "number" ? body.expectedVersion : undefined;
 
-  let result: { found: boolean; version?: number };
+  let result;
   try {
     result = await updatePageInSpace({
       spaceId: auth.space.id,
@@ -105,6 +107,7 @@ export async function PUT(
     slug,
     title: title.trim(),
     version: result.version,
+    pageId: result.pageId,
     url: `/s/${spaceKey}/${encodeURIComponent(slug)}`,
   });
 }

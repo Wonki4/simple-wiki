@@ -22,7 +22,7 @@ test("다른 활성 문서의 링크와 열람 권한으로 고아 문서를 판
   try {
     await login(page, "wiki-admin", "admin1234");
     await page.goto(home);
-    await page.getByRole("button", { name: "문서 정리" }).click();
+    await page.getByRole("button", { name: "스페이스 메뉴" }).click();
     await page.getByRole("link", { name: "고아 문서", exact: true }).click();
     await expect(page.getByText("고아 문서가 없습니다.")).toBeVisible();
 
@@ -53,12 +53,12 @@ test("다른 활성 문서의 링크와 열람 권한으로 고아 문서를 판
       await login(view, "bob", "bob1234");
       await view.goto(home);
       const nav = view.getByRole("navigation", { name: "스페이스 보기" });
-      await nav.getByRole("button", { name: "문서 정리" }).click();
+      await nav.getByRole("button", { name: "스페이스 메뉴" }).click();
       await expect(nav.getByRole("link", { name: "깨진 위키링크" })).toBeVisible();
       await expect(nav.getByRole("link", { name: "휴지통" })).toHaveCount(0);
       await nav.getByRole("link", { name: "고아 문서", exact: true }).click();
       await expect(view.locator("main .recent-list a")).toHaveCount(2);
-      await nav.getByRole("button", { name: "문서 정리" }).click();
+      await nav.getByRole("button", { name: "스페이스 메뉴" }).click();
       await expect(nav.getByRole("link", { name: "고아 문서", exact: true })).toHaveAttribute("aria-current", "page");
       expect(await view.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
       const response = await view.goto(`/s/${restricted.key}/-/orphan-pages`);

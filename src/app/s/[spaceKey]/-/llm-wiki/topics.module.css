@@ -1,0 +1,28 @@
+.emptyTitle { margin-bottom: .45rem; color: var(--ink); font-weight: 620; }
+.topics li { border-bottom: 1px solid var(--border); }
+.topics a {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: .25rem 1rem; padding-block: 1rem; overflow-wrap: anywhere;
+}
+.topicTitle { color: var(--ink); font-size: 1.04rem; font-weight: 620; }
+.topics a:hover .topicTitle { color: var(--accent); }
+.topicMeta { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.section + .section { margin-top: 2rem; }
+.item { padding-block: 1rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.item > p { color: var(--ink); line-height: 1.65; white-space: pre-wrap; }
+.citation {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .85rem;
+  margin-top: .35rem; color: var(--muted); font-size: .83rem;
+}
+.citation details[open] { flex: 1 0 100%; min-width: 0; }
+.citation summary { width: fit-content; padding-block: .3rem; cursor: pointer; }
+.citation summary:hover { color: var(--ink); }
+.citation blockquote {
+  margin: .25rem 0 .15rem; padding-inline-start: .8rem; border-inline-start: 2px solid var(--border-strong);
+  color: var(--ink-2); font-size: .94rem; line-height: 1.65; white-space: pre-wrap;
+}
+.source { min-width: 0; padding-block: .3rem; color: var(--link); }
+.source:hover { text-decoration: underline; }
+@media (pointer: coarse) {
+  .citation summary, .source { padding-block: .65rem; }
+}
