@@ -15,7 +15,13 @@ export const SERVER_INSTRUCTIONS = `이 서버는 사내 마크다운 위키(sim
 3. 문서 원문이 필요하면 get_page(space, slug) — 응답의 version을 기억합니다.
 4. 새 문서는 create_page, 같은 제목이 있으면 409 → update_page로 전환합니다.
 
-스페이스 타임라인
+LLM Wiki
+- 기존 원문을 수정할 때는 list_wiki_topics(space, sourceSlug)로 이 원문을 인용한 주제를 찾습니다. 새로 관련된 주제는 query로 검색합니다. 기존 주제는 get_wiki_topic으로 읽어 version과 항목 key를 확인합니다.
+- create_page, update_page, append_to_page, replace_in_page, revert_page에 wikiTopics를 함께 보내면 저장된 원문 버전으로 해당 주제의 변경 항목만 반영됩니다. 오탈자 수정처럼 지식 변화가 없으면 빈 배열을 보냅니다.
+- 각 항목에는 저장될 원문에서 그대로 인용한 evidence를 붙입니다. 확정된 기준은 current, 적용 사례는 example, 제안·미결 사항은 discussion입니다. 같은 기준의 변경·확정은 기존 항목 key를 재사용합니다. 새 주제는 expectedVersion을 0으로 지정합니다.
+- llmWiki.status가 pending이면 문서는 이미 저장됐습니다. 같은 작업에서 get_page(space, slug, version)로 응답의 source 원문을 확인하고 source의 pageId와 version을 그대로 save_page_wiki_topics에 넘깁니다. 409이면 최신 문서와 관련 주제를 읽어 병합합니다. pageId가 바뀌면 같은 주소에 새로 생긴 문서이므로 새 문서에서 근거를 다시 확인합니다.
+
+스페이스 변경 이력
 - create_page, update_page, append_to_page, replace_in_page, revert_page가 성공하면 같은 작업에서 응답의 slug와 version으로 save_page_timeline을 호출합니다. 부분 수정이나 복원은 먼저 get_page(space, slug, version)로 그 버전의 원문을 확인하세요.
 - 실제 채택·번복이 명시된 사항은 decision, 회의에서 제안·검토 중인 사항은 discussion입니다. 원문의 근거 문장을 그대로 인용하고 한 줄로 요약합니다. 명시된 회의일만 YYYY-MM-DD로 보냅니다. 관련 내용이 없는 버전은 entries: []로 처리하세요.
 - 과거 기록 정리를 요청받으면 list_timeline_sources의 from/to에 한국 날짜를 지정합니다. 각 버전의 원문은 get_page(version)로 읽습니다. 다음 묶음은 같은 기간에 nextCursor를 cursor로 전달하고 nextCursor가 null이면 완료합니다.
@@ -69,6 +75,23 @@ function toResult(r: ApiResult) {
     isError: !r.ok,
   };
 }
+
+const wikiKey = z.string().transform(key => key.normalize("NFC"))
+  .pipe(z.string().min(1).max(80).regex(/^[\p{L}\p{N}_-]+$/u));
+const topicPatches = z.array(z.object({
+  key: wikiKey.describe("같은 주제를 계속 가리키는 1~80자의 고정 키. 문자·숫자와 _ 또는 - 사용"),
+  title: z.string().trim().min(1).max(160).describe("주제 제목"),
+  expectedVersion: z.number().int().nonnegative().describe("get_wiki_topic의 현재 version. 처음 만드는 주제는 0"),
+  changes: z.array(z.object({
+    key: wikiKey.describe("주제 안의 1~80자 고정 항목 키. 기존 기준을 바꾸거나 제안이 확정되면 해당 키를 재사용"),
+    kind: z.enum(["current", "example", "discussion"]).describe("현재 기준, 적용 사례, 논의 중에서 선택"),
+    text: z.string().trim().min(1).max(2000).describe("독자가 이 주제에서 읽을 간결한 내용"),
+    evidence: z.string().min(1).max(2000).describe("지정한 문서 버전의 마크다운 본문에서 그대로 가져온 근거 문장"),
+  })).min(1).max(30),
+})).max(12);
+const inlineTopics = topicPatches.optional().describe(
+  "이번 원문으로 갱신할 LLM Wiki 주제와 변경 항목만 전달. 지식 변화가 없으면 []. 생략하면 저장 후 save_page_wiki_topics로 처리",
+);
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 // content_base64는 모델 컨텍스트를 통과하므로 서버 상한(20MB)보다 훨씬 작게 잡는다.
@@ -168,6 +191,35 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
     return { ok: res.ok, status: res.status, data };
   }
 
+  function saveTopics(space: string, slug: string, version: number, topics: z.infer<typeof topicPatches>, pageId?: string) {
+    return api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/llm-wiki`, {
+      method: "PUT", body: JSON.stringify({ version, topics, pageId }),
+    });
+  }
+
+  async function writeMarkdown(
+    space: string, path: string, method: "POST" | "PUT", body: object, topics: z.infer<typeof inlineTopics>,
+  ) {
+    const result = await api(`/api/spaces/${encodeURIComponent(space)}/pages${path}`, {
+      method, body: JSON.stringify(body),
+    });
+    if (!result.ok) return toResult(result);
+    const page = result.data as { slug: string; version: number; pageId?: string };
+    const withWiki = (llmWiki: object) => toResult({ ...result, data: { ...page, llmWiki } });
+    const pending = {
+      status: "pending", nextTool: "save_page_wiki_topics", source: { space, slug: page.slug, version: page.version, pageId: page.pageId },
+      message: "문서 저장 완료. 같은 작업에서 이 원문 버전의 관련 주제만 정리하세요. 변경 사항이 없으면 topics: []를 보내세요.",
+    };
+    if (topics === undefined) return withWiki(pending);
+    try {
+      const wiki = await saveTopics(space, page.slug, page.version, topics, page.pageId);
+      if (wiki.ok) return withWiki({ status: "complete", result: wiki.data });
+      return withWiki({ ...pending, httpStatus: wiki.status, error: wiki.data });
+    } catch {
+      return withWiki({ ...pending, error: "주제 저장 응답을 받지 못했습니다. 같은 원문 버전으로 주제 저장만 재시도하세요." });
+    }
+  }
+
   const server = new McpServer(
     { name: "simple-wiki", version: "1.5.1" },
     { instructions: SERVER_INSTRUCTIONS },
@@ -260,10 +312,56 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
   );
 
   server.registerTool(
+    "list_wiki_topics",
+    {
+      title: "LLM Wiki 주제 찾기",
+      description: "스페이스의 주제 제목, key, version을 조회합니다. 관련 주제를 찾아 get_wiki_topic으로 항목을 확인하세요.",
+      inputSchema: {
+        space: z.string().min(1), query: z.string().max(160).optional().describe("주제 검색어"),
+        sourceSlug: z.string().min(1).max(4096).optional().describe("현재 항목에서 이 문서를 근거로 인용한 주제로 제한"),
+        offset: z.number().int().min(0).max(2147483647).optional().describe("같은 검색의 직전 응답에서 받은 nextOffset"),
+        limit: z.number().int().min(1).max(100).optional().describe("기본 30, 최대 100"),
+      },
+    },
+    async ({ space, query, sourceSlug, offset, limit }) => {
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (sourceSlug) params.set("sourceSlug", sourceSlug);
+      if (offset !== undefined) params.set("offset", String(offset));
+      if (limit !== undefined) params.set("limit", String(limit));
+      return toResult(await api(`/api/spaces/${encodeURIComponent(space)}/llm-wiki${params.size ? "?" + params : ""}`));
+    },
+  );
+
+  server.registerTool(
+    "get_wiki_topic",
+    {
+      title: "LLM Wiki 주제와 근거 읽기",
+      description: "주제의 현재 version, 항목과 근거 문장, 원문 slug·version을 읽습니다. 근거 원문은 get_page로 읽을 수 있습니다.",
+      inputSchema: { space: z.string().min(1), key: wikiKey },
+    },
+    async ({ space, key }) => toResult(await api(`/api/spaces/${encodeURIComponent(space)}/llm-wiki/${encodeURIComponent(key)}`)),
+  );
+
+  server.registerTool(
+    "save_page_wiki_topics",
+    {
+      title: "원문 버전으로 LLM Wiki 주제 갱신",
+      description: "저장된 문서가 영향을 주는 주제·항목만 갱신합니다(editor 권한). 지식 변화가 없으면 빈 목록을 사용하세요.",
+      inputSchema: {
+        space: z.string().min(1), slug: z.string().min(1),
+        version: z.number().int().positive().describe("근거를 읽은 마크다운 문서 버전"), topics: topicPatches,
+        pageId: z.string().min(1).optional().describe("원문 저장 응답 또는 get_page의 pageId. 원문 주소가 재사용되면 갱신을 중단합니다."),
+      },
+    },
+    async ({ space, slug, version, topics, pageId }) => toResult(await saveTopics(space, slug, version, topics, pageId)),
+  );
+
+  server.registerTool(
     "save_page_timeline",
     {
       title: "문서 버전의 논의·결정 기록",
-      description: "문서를 저장한 에이전트가 해당 버전에서 확인한 논의와 결정을 스페이스 타임라인에 기록합니다. 같은 버전을 다시 보내면 그 버전의 항목 전체를 교체합니다. 편집 권한이 필요합니다.",
+      description: "문서를 저장한 에이전트가 해당 버전에서 확인한 논의와 결정을 스페이스 변경 이력에 기록합니다. 같은 버전을 다시 보내면 그 버전의 항목 전체를 교체합니다. 편집 권한이 필요합니다.",
       inputSchema: {
         space: z.string().min(1).describe("스페이스 키"),
         slug: z.string().min(1).describe("원문 문서 slug"),
@@ -286,7 +384,7 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
     "list_timeline_sources",
     {
       title: "기간 내 미처리 문서 버전",
-      description: "선택한 기간에 저장했고 아직 타임라인을 정리하지 않은 버전을 오래된 순서로 조회합니다. 각 원문은 get_page(space, slug, version)로 읽습니다.",
+      description: "선택한 기간에 저장된 문서 중 변경 이력의 논의·결정을 아직 정리하지 않은 버전을 오래된 순서로 조회합니다. 원문은 get_page(space, slug, version)로 읽습니다.",
       inputSchema: {
         space: z.string().min(1).describe("스페이스 키"),
         from: z.string().date().describe("시작일 YYYY-MM-DD (한국 날짜, 포함)"),
@@ -346,21 +444,17 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
     {
       title: "페이지 생성",
       description:
-        "새 마크다운 페이지를 만듭니다(editor 권한 필요). 같은 제목이 있으면 409입니다. 성공하면 응답의 slug·version으로 save_page_timeline을 호출해 논의와 결정을 기록하세요.",
+        "새 마크다운 페이지를 만들고 wikiTopics의 관련 주제를 갱신합니다(editor 권한 필요). 같은 제목이 있으면 409입니다. 성공하면 응답의 slug·version으로 save_page_timeline을 호출해 논의와 결정을 기록하세요.",
       inputSchema: {
         space: z.string().describe("스페이스 키"),
         title: z.string().describe("페이지 제목"),
         content: z.string().optional().describe("마크다운 본문 (생략 시 빈 문서)"),
         parent: z.string().optional().describe("부모 페이지 slug(생략 시 최상위). 페이지 트리의 위치를 정합니다."),
+        wikiTopics: inlineTopics,
       },
     },
-    async ({ space, title, content, parent }) =>
-      toResult(
-        await api(`/api/spaces/${encodeURIComponent(space)}/pages`, {
-          method: "POST",
-          body: JSON.stringify({ title, content: content ?? "", parent }),
-        }),
-      ),
+    async ({ space, title, content, parent, wikiTopics }) =>
+      writeMarkdown(space, "", "POST", { title, content: content ?? "", parent }, wikiTopics),
   );
 
   server.registerTool(
@@ -375,15 +469,11 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
         title: z.string().describe("페이지 제목"),
         content: z.string().optional().describe("교체할 마크다운 본문 전체"),
         expectedVersion: z.number().int().positive().optional().describe("get_page로 읽은 현재 version"),
+        wikiTopics: inlineTopics,
       },
     },
-    async ({ space, slug, title, content, expectedVersion }) =>
-      toResult(
-        await api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}`, {
-          method: "PUT",
-          body: JSON.stringify({ title, content: content ?? "", expectedVersion }),
-        }),
-      ),
+    async ({ space, slug, title, content, expectedVersion, wikiTopics }) =>
+      writeMarkdown(space, `/${encodeURIComponent(slug)}`, "PUT", { title, content: content ?? "", expectedVersion }, wikiTopics),
   );
 
   server.registerTool(
@@ -412,15 +502,11 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
         slug: z.string().describe("페이지 slug"),
         content: z.string().describe("덧붙일 마크다운"),
         expectedVersion: z.number().int().positive().optional().describe("get_page로 읽은 현재 version"),
+        wikiTopics: inlineTopics,
       },
     },
-    async ({ space, slug, content, expectedVersion }) =>
-      toResult(
-        await api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/append`, {
-          method: "POST",
-          body: JSON.stringify({ content, expectedVersion }),
-        }),
-      ),
+    async ({ space, slug, content, expectedVersion, wikiTopics }) =>
+      writeMarkdown(space, `/${encodeURIComponent(slug)}/append`, "POST", { content, expectedVersion }, wikiTopics),
   );
 
   server.registerTool(
@@ -434,15 +520,11 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
         old_string: z.string().describe("바꿀 기존 문자열(정확히 1곳 매치)"),
         new_string: z.string().describe("새 문자열"),
         expectedVersion: z.number().int().positive().optional().describe("get_page로 읽은 현재 version"),
+        wikiTopics: inlineTopics,
       },
     },
-    async ({ space, slug, old_string, new_string, expectedVersion }) =>
-      toResult(
-        await api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/replace`, {
-          method: "POST",
-          body: JSON.stringify({ old_string, new_string, expectedVersion }),
-        }),
-      ),
+    async ({ space, slug, old_string, new_string, expectedVersion, wikiTopics }) =>
+      writeMarkdown(space, `/${encodeURIComponent(slug)}/replace`, "POST", { old_string, new_string, expectedVersion }, wikiTopics),
   );
 
   server.registerTool(
@@ -455,15 +537,11 @@ export function createWikiMcpServer(token: string, baseUrl: string, publicUrl = 
         slug: z.string().describe("페이지 slug"),
         version: z.number().int().positive().describe("복원할 과거 리비전 번호"),
         expectedVersion: z.number().int().positive().optional().describe("현재 version(충돌 방지)"),
+        wikiTopics: inlineTopics,
       },
     },
-    async ({ space, slug, version, expectedVersion }) =>
-      toResult(
-        await api(`/api/spaces/${encodeURIComponent(space)}/pages/${encodeURIComponent(slug)}/revert`, {
-          method: "POST",
-          body: JSON.stringify({ version, expectedVersion }),
-        }),
-      ),
+    async ({ space, slug, version, expectedVersion, wikiTopics }) =>
+      writeMarkdown(space, `/${encodeURIComponent(slug)}/revert`, "POST", { version, expectedVersion }, wikiTopics),
   );
 
   server.registerTool(

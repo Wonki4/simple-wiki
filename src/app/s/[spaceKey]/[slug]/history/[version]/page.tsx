@@ -14,9 +14,10 @@ import { restoreRevision } from "@/actions/pages";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 export default async function RevisionPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ spaceKey: string; slug: string; version: string }>;
+  searchParams: Promise<{ pageId?: string | string[] }>;
 }) {
   const { spaceKey, slug: rawSlug, version: versionStr } = await params;
   const slug = decodeURIComponent(rawSlug);
@@ -27,7 +28,8 @@ export default async function RevisionPage({
   const page = await prisma.page.findUnique({
     where: { deletedAt: null, spaceId_slug: { spaceId: space.id, slug } },
   });
-  if (!page) notFound();
+  const { pageId } = await searchParams;
+  if (!page || (pageId !== undefined && pageId !== page.id)) notFound();
   const rev = await prisma.pageRevision.findUnique({
     where: { pageId_version: { pageId: page.id, version } },
   });

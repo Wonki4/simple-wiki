@@ -81,8 +81,9 @@ test("과거 회의의 제안·채택·번복을 원문과 연결하고, 월별 
     const docPath = `${spacePath}/${encodeURIComponent(slug)}`;
     const timeline = `${spacePath}/-/timeline`;
     await page.goto(spacePath);
-    await page.getByRole("link", { name: "타임라인", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "스페이스 타임라인" })).toBeVisible();
+    await page.getByRole("button", { name: "스페이스 메뉴" }).click();
+    await page.getByRole("link", { name: "변경 이력", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "변경 이력" })).toBeVisible();
     for (const period of ["1개월", "3개월", "6개월", "1년", "3년", "사용자 지정"]) {
       await expect(page.getByText(period, { exact: true }).first()).toBeVisible();
     }

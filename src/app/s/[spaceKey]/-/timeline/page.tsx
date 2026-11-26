@@ -84,7 +84,7 @@ export default async function SpaceTimeline({ params, searchParams }: {
   return (
     <main className={`collection ${styles.timeline}`}>
       <Link className="document-path" href={home}><WikiIcon name="book" /><span>{space.name}</span></Link>
-      <header className="collection-heading"><h1 className="document-title">스페이스 타임라인</h1></header>
+      <header className="collection-heading"><h1 className="document-title">변경 이력</h1></header>
       <SpaceCollectionNav spaceKey={space.key} active="timeline" canEdit={canEdit} />
       <nav aria-label="조회 기간" className={styles.periods}>
         {TIMELINE_PERIODS.map(period => <Link key={period} prefetch={false}
