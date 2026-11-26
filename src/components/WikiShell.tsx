@@ -18,7 +18,7 @@ export async function WikiShell({ children, spaces, current, session }: Props) {
   return (
     <div className="shell">
       <Sidebar
-        spaces={spaces.map(({ key, name }) => ({ key, name }))}
+        spaces={spaces}
         currentKey={current?.key ?? ""}
         currentName={current?.name ?? ""}
         pages={pages}

@@ -74,7 +74,7 @@ test("wiki-admin: 스페이스 생성과 권한 부여", async ({ page }) => {
   await page.getByRole("link", { name: "새 스페이스" }).click();
   await page.locator('input[name="key"]').fill("e2e-docs");
   await page.locator('input[name="name"]').fill("E2E 문서");
-  await page.locator('select[name="visibility"]').selectOption("restricted");
+  await page.getByRole("radio", { name: "비공개", exact: true }).check();
   await page.getByRole("button", { name: "만들기" }).click();
   await expect(page.getByRole("heading", { name: "E2E 문서" })).toBeVisible();
 

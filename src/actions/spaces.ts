@@ -32,7 +32,7 @@ export async function updateSpaceVisibility(spaceKey: string, formData: FormData
   const { space } = await requireSpaceRole(spaceKey, "admin");
   const visibility = formData.get("visibility") === "restricted" ? "restricted" : "organization";
   await prisma.space.update({ where: { id: space.id }, data: { visibility } });
-  revalidatePath(`/s/${spaceKey}/settings`);
+  revalidatePath(`/s/${spaceKey}`, "layout");
   revalidatePath("/");
 }
 

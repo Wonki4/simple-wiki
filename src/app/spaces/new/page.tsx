@@ -1,4 +1,5 @@
 import { SettingsPage } from "@/components/SettingsPage";
+import { SpaceVisibilityField } from "@/components/SpaceVisibilityField";
 import { WikiShell } from "@/components/WikiShell";
 import { redirect } from "next/navigation";
 import { listReadableSpaces, requireSession } from "@/lib/access";
@@ -24,13 +25,7 @@ export default async function NewSpacePage() {
             <span>설명</span>
             <input name="description" className="input" />
           </label>
-          <label className="field">
-            <span>공개 범위</span>
-            <select name="visibility" className="select">
-              <option value="organization">전체 공개 (로그인 사용자 모두 읽기)</option>
-              <option value="restricted">제한 (권한 부여된 대상만)</option>
-            </select>
-          </label>
+          <SpaceVisibilityField defaultValue="organization" />
           <div>
             <button className="btn btn-primary">만들기</button>
           </div>
